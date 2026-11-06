@@ -82,6 +82,7 @@ class HostListener final : public juce::AudioProcessorListener {
   void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& d) override {
     if (d.latencyChanged) ++latencyChanges;
     if (d.programChanged) ++programChanges;
+    if (d.parameterInfoChanged) ++parameterInfoChanges;
   }
   void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, int index) override {
     ++gestureBegins[static_cast<size_t>(index)];
@@ -96,14 +97,14 @@ class HostListener final : public juce::AudioProcessorListener {
   }
   void reset() {
     changes.fill(0);
-    latencyChanges = programChanges = 0;
+    latencyChanges = programChanges = parameterInfoChanges = 0;
   }
 
   juce::AudioProcessor& proc;
   std::array<int, 64> changes{};
   std::array<int, 64> gestureBegins{};
   std::array<int, 64> gestureEnds{};
-  int latencyChanges = 0, programChanges = 0;
+  int latencyChanges = 0, programChanges = 0, parameterInfoChanges = 0;
 };
 
 inline std::unique_ptr<vjn6::Snapshot> snapshotOf(VJN6AudioProcessor& p) {

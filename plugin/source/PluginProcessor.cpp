@@ -87,9 +87,10 @@ VJN6AudioProcessor::VJN6AudioProcessor()
   vjn6::firstRunState(*first, isStandalone());
   auto snap = std::make_unique<vjn6::Snapshot>();
   inst_->snapshot(*snap);
+  mode_.store(snap->settings.v[vjn6::S_MODE] == 1 ? 1 : 0);
   for (int i = 0; i < kNumHostParams; ++i) {
     NativeParam* access = nullptr;
-    auto p = createHostParameter(i, nativeOf(i, first->edit, first->perf), *this, access);
+    auto p = createHostParameter(i, nativeOf(i, first->edit, first->perf), *this, access, mode_);
     access_[static_cast<size_t>(i)] = access;
     hostValues_[static_cast<size_t>(i)].store(nativeOf(i, snap->edit, snap->perf));
     lastWriterIsPlugin_[static_cast<size_t>(i)].store(false);
@@ -336,9 +337,11 @@ void VJN6AudioProcessor::setStateInformation(const void* data, int sizeInBytes) 
     std::lock_guard<std::mutex> lock(namesMutex_);
     for (int s = 0; s < vjn6::kNumSlots; ++s) programNames_[static_cast<size_t>(s)] = juce::String(st->bank[s].name.s);
   }
+  const int newMode = st->settings.v[vjn6::S_MODE] == 1 ? 1 : 0;
+  const bool modeChanged = mode_.exchange(newMode) != newMode;
   syncParametersFromState(st->edit, st->perf, true);
   if (!isRenderingFromDevice()) pumpCore(static_cast<int>(inst_->sampleRate() * 0.005) + 1);
-  updateHostDisplay(ChangeDetails().withProgramChanged(true));
+  updateHostDisplay(ChangeDetails().withProgramChanged(true).withParameterInfoChanged(modeChanged));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -365,7 +368,7 @@ void VJN6AudioProcessor::injectMidi(const uint8_t* bytes, int len) {
 
 void VJN6AudioProcessor::pollNow() {
   std::vector<std::string> out;
-  programChanged_ = namesDirty_ = stateChanged_ = false;
+  programChanged_ = namesDirty_ = stateChanged_ = paramInfoChanged_ = false;
   bridge_->poll(out);
   if (!programAnnounced_) {
     // tell the wrapper the current program once it listens (AU present preset, VST3 program list)
@@ -373,8 +376,11 @@ void VJN6AudioProcessor::pollNow() {
     programChanged_ = true;
   }
   if (namesDirty_) refreshProgramNames();
-  if (programChanged_ || stateChanged_)
-    updateHostDisplay(ChangeDetails().withProgramChanged(programChanged_).withNonParameterStateChanged(stateChanged_));
+  if (programChanged_ || stateChanged_ || paramInfoChanged_)
+    updateHostDisplay(ChangeDetails()
+                          .withProgramChanged(programChanged_)
+                          .withNonParameterStateChanged(stateChanged_)
+                          .withParameterInfoChanged(paramInfoChanged_));
 
   const double now = nowMs();
   for (int i = 0; i < kNumHostParams; ++i) {
@@ -412,6 +418,10 @@ void VJN6AudioProcessor::handleEvent(const vjn6::Event& e) {
     }
     case vjn6::EventType::SettingChanged:
       stateChanged_ = true;
+      if (e.a == vjn6::S_MODE) {
+        mode_.store(e.i == 1 ? 1 : 0);
+        paramInfoChanged_ = true;  // p_vca_level shows a different string in each mode
+      }
       if (e.a == vjn6::S_ZOOM && onZoomChanged) onZoomChanged(e.i);
       break;
     case vjn6::EventType::SlotChanged:

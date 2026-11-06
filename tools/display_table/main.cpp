@@ -1,6 +1,7 @@
 // Writes the R-P5 / §4.8 reference table used by the UI formatter test (AC-P5.1):
 // every patch field and knob at every byte, both modes, with the contexts that change the text
-// (PWM source for PWM, polarity for VCF ENV), plus every host value string.
+// (PWM source for PWM, polarity for VCF ENV), plus every host value string: "host" in 106 mode and "host60"
+// in 60 mode (they differ only in p_vca_level, v3.2 C-4).
 #include <cstdio>
 #include <string>
 
@@ -28,7 +29,7 @@ int main(int argc, char** argv) {
           first = false;
           o += "    {\"mode\":" + std::to_string(mode) + ",\"field\":" + std::to_string(f) + ",\"ctx\":" +
                std::to_string(ctx) + ",\"byte\":" + std::to_string(v) + ",\"v\":";
-          json::appendString(o, f == W_HPF ? std::to_string(v) : display::sliderV(v));
+          json::appendString(o, f == W_HPF ? std::to_string(v) : display::fieldV(f, v, m));
           o += ",\"engine\":";
           json::appendString(o, display::fieldEngineValue(f, v, m, p));
           o += "}";
@@ -53,16 +54,18 @@ int main(int argc, char** argv) {
       }
     }
   }
-  o += "\n  ],\n  \"host\": [\n";
-  first = true;
-  for (int i = 0; i < display::kNumHostParams; ++i) {
-    const auto& hp = display::hostParam(i);
-    for (int v = hp.minValue; v <= hp.maxValue; ++v) {
-      if (!first) o += ",\n";
-      first = false;
-      o += "    {\"index\":" + std::to_string(i) + ",\"id\":\"" + hp.id + "\",\"value\":" + std::to_string(v) + ",\"text\":";
-      json::appendString(o, display::hostValueString(i, v));
-      o += "}";
+  for (const Mode hm : {Mode::J106, Mode::J60}) {
+    o += hm == Mode::J106 ? "\n  ],\n  \"host\": [\n" : "\n  ],\n  \"host60\": [\n";
+    first = true;
+    for (int i = 0; i < display::kNumHostParams; ++i) {
+      const auto& hp = display::hostParam(i);
+      for (int v = hp.minValue; v <= hp.maxValue; ++v) {
+        if (!first) o += ",\n";
+        first = false;
+        o += "    {\"index\":" + std::to_string(i) + ",\"id\":\"" + hp.id + "\",\"value\":" + std::to_string(v) + ",\"text\":";
+        json::appendString(o, display::hostValueString(i, v, hm));
+        o += "}";
+      }
     }
   }
   o += "\n  ]\n}\n";

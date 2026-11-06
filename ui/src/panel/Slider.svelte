@@ -1,5 +1,6 @@
 <script lang="ts">
-  // A 20 × 300 slider with a 0–10 tick scale (§5.2); the 106 HPF slider snaps to 4 positions.
+  // A 20 × 300 slider with a 0–10 tick scale (§5.2); the 60 VCA LEVEL is centre-zero with a −5…+5
+  // scale (R-P5, C-4); the 106 HPF slider snaps to 4 positions.
   import { app } from '../model.svelte';
   import { Field } from '../protocol';
   import { fieldTooltip, fieldV, parseTyped } from './format';
@@ -21,6 +22,13 @@
   const capY = $derived((1 - value / max) * travel);
   const ticks = $derived(Array.from({ length: isHpf ? 4 : 11 }, (_, i) => i));
   const tickY = (i: number, n: number) => (1 - i / (n - 1)) * travel + SLIDER_CAP_H / 2;
+  // the same 11 tick positions, numbered −5…+5 with 0 at the centre (the panel's typographic minus)
+  const centreZero = $derived(!is106 && field === Field.VCA_LEVEL);
+  const tickLabel = (i: number) => {
+    if (!centreZero) return String(i);
+    const t = i - 5;
+    return t > 0 ? `+${t}` : t < 0 ? `−${-t}` : '0';
+  };
 
   let el: HTMLDivElement | undefined = $state();
   $effect(() => () => app.hideTip(def.id)); // a control that leaves the panel takes its tooltip
@@ -60,13 +68,13 @@
   function onDblClick() {
     app.openTyped({
       owner: def.id,
-      initial: fieldV(field, value),
+      initial: fieldV(field, value, is106),
       x: def.x + SLIDER_W / 2 - 28,
       y: def.y - 24,
       w: 56,
       returnFocus: el ?? null,
       commit: (text) => {
-        const b = parseTyped(isHpf ? 'hpf' : 'byte', text, 0, max);
+        const b = parseTyped(isHpf ? 'hpf' : centreZero ? 'vca60' : 'byte', text, 0, max);
         if (b !== null) set(b);
       },
     });
@@ -79,13 +87,14 @@
 <svg
   class="scale"
   aria-hidden="true"
+  data-testid="scale-{def.id}"
   width="16"
   height={SLIDER_H}
   viewBox="0 0 16 {SLIDER_H}"
   style="left:{def.x - 16}px; top:{def.y}px"
 >
   {#each ticks as i (i)}
-    <text x="9" y={tickY(i, ticks.length) + 3.2} text-anchor="end" class="num">{i}</text>
+    <text x="9" y={tickY(i, ticks.length) + 3.2} text-anchor="end" class="num">{tickLabel(i)}</text>
     <line x1="11" x2="15" y1={tickY(i, ticks.length)} y2={tickY(i, ticks.length)} class="tick" />
   {/each}
 </svg>

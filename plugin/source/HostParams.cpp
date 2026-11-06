@@ -8,22 +8,29 @@ namespace vjn6plugin {
 namespace {
 thread_local bool tlsOwnWrite = false;
 
-juce::String valueText(int index, int native) { return juce::String(vjn6::display::hostValueString(index, native)); }
+vjn6::Mode modeOf(const std::atomic<int>& mode) {
+  return mode.load(std::memory_order_relaxed) == 1 ? vjn6::Mode::J106 : vjn6::Mode::J60;
+}
 
-int valueFromText(int index, const juce::String& text, int fallback) {
+juce::String valueText(int index, int native, const std::atomic<int>& mode) {
+  return juce::String(vjn6::display::hostValueString(index, native, modeOf(mode)));
+}
+
+int valueFromText(int index, const juce::String& text, int fallback, const std::atomic<int>& mode) {
   int v = fallback;
-  if (vjn6::display::hostValueFromString(index, text.trim().toStdString(), v)) return v;
+  if (vjn6::display::hostValueFromString(index, text.trim().toStdString(), v, modeOf(mode))) return v;
   return fallback;
 }
 
 class IntParam final : public juce::AudioParameterInt, public NativeParam {
  public:
-  IntParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l)
+  IntParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l,
+           const std::atomic<int>& mode)
       : juce::AudioParameterInt(juce::ParameterID{info.id, 1}, info.name, info.minValue, info.maxValue, def,
                                 juce::AudioParameterIntAttributes()
-                                    .withStringFromValueFunction([index](int v, int) { return valueText(index, v); })
-                                    .withValueFromStringFunction([index, def](const juce::String& t) {
-                                      return valueFromText(index, t, def);
+                                    .withStringFromValueFunction([index, &mode](int v, int) { return valueText(index, v, mode); })
+                                    .withValueFromStringFunction([index, def, &mode](const juce::String& t) {
+                                      return valueFromText(index, t, def, mode);
                                     })),
         index_(index),
         listener_(l) {}
@@ -43,13 +50,14 @@ class IntParam final : public juce::AudioParameterInt, public NativeParam {
 
 class ChoiceParam final : public juce::AudioParameterChoice, public NativeParam {
  public:
-  ChoiceParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l)
+  ChoiceParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l,
+              const std::atomic<int>& mode)
       : juce::AudioParameterChoice(
             juce::ParameterID{info.id, 1}, info.name, choicesOf(info), def - info.minValue,
             juce::AudioParameterChoiceAttributes()
-                .withStringFromValueFunction([index, minV = info.minValue](int i, int) { return valueText(index, i + minV); })
-                .withValueFromStringFunction([index, def, minV = info.minValue](const juce::String& t) {
-                  return valueFromText(index, t, def) - minV;
+                .withStringFromValueFunction([index, minV = info.minValue, &mode](int i, int) { return valueText(index, i + minV, mode); })
+                .withValueFromStringFunction([index, def, minV = info.minValue, &mode](const juce::String& t) {
+                  return valueFromText(index, t, def, mode) - minV;
                 })),
         index_(index),
         min_(info.minValue),
@@ -75,12 +83,13 @@ class ChoiceParam final : public juce::AudioParameterChoice, public NativeParam 
 
 class BoolParam final : public juce::AudioParameterBool, public NativeParam {
  public:
-  BoolParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l)
+  BoolParam(int index, const vjn6::display::HostParamInfo& info, int def, HostWriteListener& l,
+            const std::atomic<int>& mode)
       : juce::AudioParameterBool(juce::ParameterID{info.id, 1}, info.name, def != 0,
                                  juce::AudioParameterBoolAttributes()
-                                     .withStringFromValueFunction([index](bool b, int) { return valueText(index, b ? 1 : 0); })
-                                     .withValueFromStringFunction([index, def](const juce::String& t) {
-                                       return valueFromText(index, t, def) != 0;
+                                     .withStringFromValueFunction([index, &mode](bool b, int) { return valueText(index, b ? 1 : 0, mode); })
+                                     .withValueFromStringFunction([index, def, &mode](const juce::String& t) {
+                                       return valueFromText(index, t, def, mode) != 0;
                                      })),
         index_(index),
         listener_(l) {}
@@ -120,19 +129,19 @@ int perfForHostIndex(int index) {
 }
 
 std::unique_ptr<juce::RangedAudioParameter> createHostParameter(int index, int def, HostWriteListener& listener,
-                                                                 NativeParam*& access) {
+                                                                 NativeParam*& access, const std::atomic<int>& mode) {
   const auto& info = vjn6::display::hostParam(index);
   if (isPerfBool(index)) {
-    auto p = std::make_unique<BoolParam>(index, info, def, listener);
+    auto p = std::make_unique<BoolParam>(index, info, def, listener, mode);
     access = p.get();
     return p;
   }
   if (info.isChoice) {
-    auto p = std::make_unique<ChoiceParam>(index, info, def, listener);
+    auto p = std::make_unique<ChoiceParam>(index, info, def, listener, mode);
     access = p.get();
     return p;
   }
-  auto p = std::make_unique<IntParam>(index, info, def, listener);
+  auto p = std::make_unique<IntParam>(index, info, def, listener, mode);
   access = p.get();
   return p;
 }

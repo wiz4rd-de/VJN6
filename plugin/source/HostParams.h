@@ -8,6 +8,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <atomic>
 #include <memory>
 
 namespace vjn6plugin {
@@ -49,7 +50,9 @@ int perfForHostIndex(int index);  // -1 for fields
 
 // Creates parameter `index` with the given default (native units). `access` receives the
 // NativeParam view of the returned object.
+// `mode` (0 = 60, 1 = 106, read on any thread) selects the value strings of the active mode (§4.8:
+// p_vca_level differs between the modes, v3.2 C-4).
 std::unique_ptr<juce::RangedAudioParameter> createHostParameter(int index, int defaultNative, HostWriteListener& listener,
-                                                                 NativeParam*& access);
+                                                                 NativeParam*& access, const std::atomic<int>& mode);
 
 }  // namespace vjn6plugin

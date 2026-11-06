@@ -1,5 +1,5 @@
-// AC-U1.1: mouse, wheel, typed entry and keyboard on sliders, knobs, TUNE, the 106 HPF slider, switches
-// and the lever (R-U1, R-U1a). Drag distances are logical canvas px: CSS px ÷ the canvas scale.
+// AC-U1.1: mouse, wheel, typed entry and keyboard on sliders, knobs, TUNE, the 60 VCA LEVEL, the 106 HPF
+// slider, switches and the lever (R-U1, R-U1a). Drag distances are logical canvas px: CSS px ÷ the canvas scale.
 import type { Locator, Page } from '@playwright/test';
 import {
   canvasScale,
@@ -171,6 +171,39 @@ test.describe('AC-U1.1 sliders and knobs', () => {
       await expectValue(page, res, b, (v) => v === 12 || v === 13, `scale ${scale}: Ctrl-drag → +2…3`);
       await drag(page, res, -20);
       await expectValue(page, res, b, (v) => v === 2 || v === 3, `scale ${scale}: drag down 20 → −10`);
+    }
+  });
+
+  test('AC-U1.1 60 VCA LEVEL typed entry: -2 → 38, +5 → 127, 9 → 127, -9 → 0, 0 → 64; 106 mode unchanged (C-4)', async ({
+    page,
+  }) => {
+    await openAndStart(page);
+    const level = ctl(page, 'vca-level');
+    const b = { field: F.VCA_LEVEL };
+    for (const [text, byte, shown] of [
+      ['-2', 38, '-2.0'],
+      ['+5', 127, '+5.0'],
+      ['-9', 0, '-5.0'],
+      ['0', 64, '0.0'],
+      ['9', 127, '+5.0'],
+    ] as const) {
+      await typeValue(page, level, text);
+      await expectValue(page, level, b, byte, `60 VCA LEVEL typed ${text} → ${byte}`);
+      const prefix = `VCA LEVEL ${shown} = `.replace(/[+.]/g, '\\$&');
+      await expect(level).toHaveAttribute('aria-valuetext', new RegExp(`^${prefix}`));
+    }
+    await typeValue(page, level, 'abc');
+    await page.waitForTimeout(100);
+    expect(await value(page, b), 'typed abc reverts').toBe(127);
+
+    await setMode(page, '106');
+    for (const [text, byte] of [
+      ['5', 64],
+      ['-2', 0],
+      ['12', 127],
+    ] as const) {
+      await typeValue(page, level, text);
+      await expectValue(page, level, b, byte, `106 VCA LEVEL typed ${text} → ${byte}`);
     }
   });
 

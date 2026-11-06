@@ -109,6 +109,31 @@ std::string percent(double x) { return std::to_string(static_cast<long long>(rou
 
 std::string sliderV(int byte) { return fixed(byte / 12.7, 1); }
 
+std::string vcaLevel60V(int byte) {
+  // v = byte/12.7 - 5 to one decimal; the sign only on a non-zero rounded value (so 63 and 64 show "0.0")
+  const long long t = static_cast<long long>(roundAway((byte / 12.7 - 5.0) * 10.0));
+  if (t == 0) return "0.0";
+  return (t > 0 ? "+" : "-") + digits(t > 0 ? t : -t, 1);
+}
+
+std::string fieldV(int field, int byte, Mode m) {
+  if (m == Mode::J60 && field == B_VCA_LEVEL) return vcaLevel60V(byte);
+  return sliderV(byte);
+}
+
+int fieldByteFromV(int field, double v, Mode m) {
+  // round(x) = floor(x + 0.5) on a non-negative argument (R-P5, R-U1)
+  double x;
+  if (m == Mode::J60 && field == B_VCA_LEVEL) {
+    const double c = v < -5.0 ? -5.0 : (v > 5.0 ? 5.0 : v);
+    x = (c + 5.0) * 12.7;
+  } else {
+    x = v * 12.7;
+  }
+  const long long b = static_cast<long long>(roundAway(x));
+  return static_cast<int>(b < 0 ? 0 : (b > 127 ? 127 : b));
+}
+
 std::string tuneV(int byte) { return signedFixed((byte - 64) * k::kTuneCentsPerStep, 1); }
 
 std::string fieldEngineValue(int field, int b, Mode m, const Patch& ctx) {
@@ -217,7 +242,7 @@ const std::vector<HostParamInfo>& params() {
 
 const HostParamInfo& hostParam(int index) { return params()[static_cast<std::size_t>(index)]; }
 
-std::string hostValueString(int index, int value) {
+std::string hostValueString(int index, int value, Mode m) {
   const HostParamInfo& p = hostParam(index);
   if (p.isChoice) {
     const int i = value - p.minValue;
@@ -226,10 +251,10 @@ std::string hostValueString(int index, int value) {
   }
   if (index == kNumHostParams - 1) return tuneV(value);
   if (index == kNumHostParams - 2) return value > 0 ? "+" + std::to_string(value) : std::to_string(value);
-  return sliderV(value);
+  return fieldV(index, value, m);  // the 16 slider parameters have the field's index
 }
 
-bool hostValueFromString(int index, const std::string& text, int& value) {
+bool hostValueFromString(int index, const std::string& text, int& value, Mode m) {
   const HostParamInfo& p = hostParam(index);
   if (p.isChoice) {
     for (std::size_t i = 0; i < p.choices.size(); ++i)
@@ -245,7 +270,7 @@ bool hostValueFromString(int index, const std::string& text, int& value) {
   int v;
   if (index == kNumHostParams - 1) v = static_cast<int>(roundAway(d / k::kTuneCentsPerStep)) + 64;
   else if (index == kNumHostParams - 2) v = static_cast<int>(roundAway(d));
-  else v = static_cast<int>(roundAway(d * 12.7));
+  else v = fieldByteFromV(index, d, m);
   if (v < p.minValue) v = p.minValue;
   if (v > p.maxValue) v = p.maxValue;
   value = v;

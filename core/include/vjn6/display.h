@@ -22,6 +22,11 @@ std::string percent(double x);                        // "73 %"
 
 // ---- control values ----
 std::string sliderV(int byte);                        // byte / 12.7, one decimal: "5.0"
+std::string vcaLevel60V(int byte);                    // 60 VCA LEVEL: byte / 12.7 - 5, signed: "-5.0", "0.0", "+2.0"
+// The v a slider shows and accepts for the active mode (R-P5): sliderV, or vcaLevel60V for B10 in 60 mode.
+std::string fieldV(int field, int byte, Mode m);
+// Typed entry (R-U1): the byte committed for a typed v; out-of-range values are clamped.
+int fieldByteFromV(int field, double v, Mode m);
 std::string tuneV(int byte);                          // cents, one decimal with sign: "+10.2"
 // Engine value of a patch field at a byte for the active mode (R-P5). ctx supplies the PWM source
 // (for PWM) and the polarity (for VCF ENV).
@@ -40,10 +45,11 @@ struct HostParamInfo {
   std::vector<std::string> choices;
 };
 const HostParamInfo& hostParam(int index);
-// Host value string for a native value (R-P6: identical to the panel's v).
-std::string hostValueString(int index, int value);
+// Host value string for a native value in the active mode (R-P6: identical to the panel's v; only
+// p_vca_level differs between the modes).
+std::string hostValueString(int index, int value, Mode m);
 // Parses a host value string back to a native value; returns false if not understood.
-bool hostValueFromString(int index, const std::string& text, int& value);
+bool hostValueFromString(int index, const std::string& text, int& value, Mode m);
 // Host parameter index -> core field / perf.
 inline bool hostIsField(int index) { return index < kNumFields; }
 

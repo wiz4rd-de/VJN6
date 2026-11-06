@@ -81,10 +81,14 @@ std::string oneDecimal(double tenths, bool sign) {
   return s;
 }
 
-// R-P5 / R-P6 value strings computed from the spec rules.
-std::string expected(int i, int v) {
+// R-P5 / R-P6 value strings computed from the spec rules, in the active mode.
+std::string expected(int i, int v, bool is106) {
   const auto c = choicesOf(i);
   if (!c.empty()) return c[static_cast<size_t>(v - minOf(i))];
+  if (i == 10 && !is106) {  // 60 VCA LEVEL: v / 12.7 - 5, signed, zero shown as 0.0 (v3.2 C-4)
+    const std::string s = oneDecimal(v * 100.0 / 127.0 - 50.0, true);
+    return s == "+0.0" ? "0.0" : s;
+  }
   if (i == 39) return oneDecimal((v - 64) * 500.0 / 64.0, true);  // cents = (v - 64) * 50/64
   if (i == 38) return v > 0 ? "+" + std::to_string(v) : std::to_string(v);
   return oneDecimal(v * 100.0 / 127.0, false);  // v / 12.7
@@ -93,30 +97,60 @@ std::string expected(int i, int v) {
 
 TEST_CASE("AC-PL2 40 host parameters with the §4.8 IDs, order, names, types and value strings", "[AC-PL2]") {
   auto p = makeProcessor();
+  TestHost host(*p);
+  HostListener listener(*p);
   const auto& params = p->getParameters();
   REQUIRE(params.size() == 40);
-  for (int i = 0; i < 40; ++i) {
-    INFO("parameter " << i);
-    auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(params[i]);
-    REQUIRE(withId != nullptr);
-    CHECK(withId->paramID == kIds[i]);
-    CHECK(params[i]->getName(100) == kNames[i]);
-    CHECK(params[i]->isAutomatable());
-    switch (kindOf(i)) {
-      case Int: CHECK(dynamic_cast<juce::AudioParameterInt*>(params[i]) != nullptr); break;
-      case Choice: CHECK(dynamic_cast<juce::AudioParameterChoice*>(params[i]) != nullptr); break;
-      case Bool: CHECK(dynamic_cast<juce::AudioParameterBool*>(params[i]) != nullptr); break;
+  // the value strings follow the active mode (§4.8): first run is 60 mode, then 106 mode
+  for (const bool is106 : {false, true}) {
+    if (is106) {
+      listener.reset();
+      p->handleUiMessage(R"({"t":"setting","s":0,"v":1})");
+      host.run(2);
+      REQUIRE(snapshotOf(*p)->settings.v[vjn6::S_MODE] == 1);
+      CHECK(listener.parameterInfoChanges >= 1);  // the host is told that the strings changed
+    } else {
+      REQUIRE(snapshotOf(*p)->settings.v[vjn6::S_MODE] == 0);
     }
-    auto& np = p->hostParam(i);
-    for (int v = minOf(i); v <= maxOf(i); ++v) {
-      const float norm = np.normalisedFor(v);
-      const juce::String text = params[i]->getText(norm, 100);
-      CHECK(text.toStdString() == expected(i, v));
-      // typed entry in the host: the text maps back to a value showing the same text (R-U1: sliders
-      // commit round(v x 12.7), so several bytes share one text); exact where the text is unique
-      const float back = params[i]->getValueForText(text);
-      CHECK(params[i]->getText(back, 100) == text);
-      if (kindOf(i) != Int || i == 38 || i == 39) CHECK(std::abs(back - norm) < 1e-6f);
+    for (int i = 0; i < 40; ++i) {
+      INFO((is106 ? "106" : "60") << " mode, parameter " << i);
+      auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(params[i]);
+      REQUIRE(withId != nullptr);
+      CHECK(withId->paramID == kIds[i]);
+      CHECK(params[i]->getName(100) == kNames[i]);
+      CHECK(params[i]->isAutomatable());
+      switch (kindOf(i)) {
+        case Int: CHECK(dynamic_cast<juce::AudioParameterInt*>(params[i]) != nullptr); break;
+        case Choice: CHECK(dynamic_cast<juce::AudioParameterChoice*>(params[i]) != nullptr); break;
+        case Bool: CHECK(dynamic_cast<juce::AudioParameterBool*>(params[i]) != nullptr); break;
+      }
+      auto& np = p->hostParam(i);
+      for (int v = minOf(i); v <= maxOf(i); ++v) {
+        const float norm = np.normalisedFor(v);
+        const juce::String text = params[i]->getText(norm, 100);
+        CHECK(text.toStdString() == expected(i, v, is106));
+        // typed entry in the host: the text maps back to a value showing the same text (R-U1: sliders
+        // commit round(v x 12.7), so several bytes share one text); exact where the text is unique
+        const float back = params[i]->getValueForText(text);
+        CHECK(params[i]->getText(back, 100) == text);
+        if (kindOf(i) != Int || i == 38 || i == 39) CHECK(std::abs(back - norm) < 1e-6f);
+      }
+    }
+    // AC-P5.1 / AC-U1.1 host side: p_vca_level at bytes 0, 64, 127 and typed values
+    auto vca = [&](int b) { return params[10]->getText(p->hostParam(10).normalisedFor(b), 100).toStdString(); };
+    auto typed = [&](const char* t) { return params[10]->getValueForText(t); };
+    if (is106) {
+      CHECK(vca(0) == "0.0");
+      CHECK(vca(64) == "5.0");
+      CHECK(vca(127) == "10.0");
+      CHECK(typed("5.0") == p->hostParam(10).normalisedFor(64));
+    } else {
+      CHECK(vca(0) == "-5.0");
+      CHECK(vca(64) == "0.0");
+      CHECK(vca(127) == "+5.0");
+      CHECK(typed("-2") == p->hostParam(10).normalisedFor(38));
+      CHECK(typed("+5") == p->hostParam(10).normalisedFor(127));
+      CHECK(typed("9") == p->hostParam(10).normalisedFor(127));
     }
   }
   // spot checks from the spec text

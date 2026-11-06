@@ -154,6 +154,8 @@ class VJN6AudioProcessor final : public juce::AudioProcessor, private HostWriteL
   std::array<bool, kNumHostParams> gestureActive_{};
   std::array<double, kNumHostParams> gestureEndDue_{};
   bool programChanged_ = false, namesDirty_ = false, stateChanged_ = false, programAnnounced_ = false;
+  bool paramInfoChanged_ = false;  // the mode changed: value strings differ (§4.8, v3.2 C-4)
+  std::atomic<int> mode_{0};       // active mode for the host value strings: 0 = 60, 1 = 106
 
   // rendering
   std::atomic<bool> rendering_{false};

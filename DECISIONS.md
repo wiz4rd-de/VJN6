@@ -290,3 +290,30 @@ Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, 
 - The switch keeps the "graded positions put the highest at the top" rule (UI section): U, N, D from top to
   bottom, Up moves towards U. Screenshots: `panel-60-*`, plus `settings-60` and `bank-manager-60`, where the
   switch shows dimmed behind the overlay; every 106 PNG is byte-identical.
+
+### C-4 60 VCA LEVEL is centre-zero (−5…+5)
+- **One rule in the core** (`core/panel/display.cpp`): `fieldV(field, byte, mode)` is the v a slider shows
+  (byte/12.7, or byte/12.7 − 5 for B10 in 60 mode) and `fieldByteFromV` the typed-entry inverse (60 VCA
+  LEVEL: v clamped to −5…+5, then floor((v + 5) × 12.7 + 0.5); others unchanged). The host string and
+  parse (`hostValueString`, `hostValueFromString`) now take the mode; only `p_vca_level` differs. The UI's
+  `format.ts` reproduces the same rule; the engine, the byte and the tooltip's dB are unchanged (a new core
+  test checks that byte 64 still renders at 64/127 of byte 127 and byte 0 is silent).
+- **Zero shows without a sign:** a value that rounds to 0.0 shows `0.0` (bytes 63 and 64), every other value
+  carries `+` or `-` (`+0.1` at byte 65); `-0.0` and `+0.0` never appear. Typed `0` commits 64.
+- **Display table:** `fields` rows for 60 mode, VCA LEVEL changed (128 rows); the `host` section is the
+  106-mode strings and is unchanged; a new `host60` section holds the 60-mode strings (it differs from
+  `host` only in `p_vca_level`), so R-P6 is checked within each mode.
+- **Plugin strings follow the mode:** the processor keeps the active mode in an atomic (from the first
+  snapshot, from `SettingChanged(S_MODE)` events and from `setStateInformation`), the parameter string
+  lambdas read it, and a mode change calls `updateHostDisplay(...withParameterInfoChanged(true))` so hosts
+  refresh the displayed strings. Between the mode switch and the next poll of the core's events the host
+  may still see the previous mode's strings.
+- **AC-PL2 (plugin):** the value-string loop runs in 60 mode (first run) and again after switching to 106
+  mode; in 106 mode every expectation is the one before v3.2.
+- **UI tick scale:** the 60 VCA LEVEL ticks read `−5 … −1, 0, +1 … +5` on the same 11 positions as 0–10;
+  negatives use U+2212 (the minus already on the 60 polarity switch), positives carry `+` like the value
+  strings. 106 VCA LEVEL keeps 0–10.
+- **UI typed entry:** the field opens on the ASCII-signed v (`-5.0`, `+2.0`), the same string as the
+  tooltip and the host; it accepts ASCII `+`/`-` (not U+2212). The UI's formatter functions take the mode as
+  a required argument, so no caller can fall back to the 106 form; the scale carries
+  `data-testid="scale-<id>"` for AC-P5.1. Screenshots: `panel-60-*` only.

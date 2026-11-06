@@ -1,5 +1,6 @@
 // Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, 60 chorus toggles), AC-U4.1
-// (combination press) and AC-S3.3 (a mocked MIDI CC is visible within 100 ms).
+// (combination press), AC-P5.1 (UI part: the centre-zero 60 VCA LEVEL) and AC-S3.3 (a mocked MIDI CC is
+// visible within 100 ms).
 import type { Page } from '@playwright/test';
 import { ctl, expect, F, midi, openAndStart, P, setMode, state, test, waitForState, type CoreState } from './fixtures';
 
@@ -320,6 +321,61 @@ test('AC-U4.1 106 mode, POLY 1 lit: Shift+click POLY 2 → UNISON; Shift+click P
   // the tooltip names the Shift+click (R-U4)
   await p2.hover();
   await expect(page.getByTestId('tooltip')).toHaveText('POLY 2 — Shift+click with POLY 1 lit: UNISON');
+});
+
+/** Sets VCA LEVEL to `byte` with the keyboard (R-U1a) and reads its v on the panel, in the tooltip and in typed entry. */
+async function vcaLevelShown(page: Page, byte: number): Promise<{ panel: string; tooltip: string; typed: string }> {
+  const loc = ctl(page, 'vca-level');
+  await loc.focus();
+  await page.keyboard.press(byte > 64 ? 'End' : 'Home');
+  for (let b = byte > 64 ? 127 : 0; b !== byte; ) {
+    const step = Math.abs(byte - b) >= 10 ? 10 : 1;
+    await page.keyboard.press(`${step === 10 ? 'Shift+' : ''}${byte > b ? 'ArrowUp' : 'ArrowDown'}`);
+    b += byte > b ? step : -step;
+  }
+  await waitForState(page, (s) => s.edit[F.VCA_LEVEL] === byte, `VCA LEVEL byte ${byte}`);
+  await expect(loc).toHaveAttribute('data-value', String(byte));
+  await page.mouse.move(1, 1);
+  await loc.hover();
+  const tip = page.getByTestId('tooltip');
+  await expect(tip).toBeVisible();
+  const tooltip = (await tip.textContent()) ?? '';
+  await loc.dblclick();
+  const typed = await page.getByTestId('typed-entry').inputValue();
+  await page.getByTestId('typed-entry').press('Escape');
+  await expect(page.getByTestId('typed-entry')).toHaveCount(0);
+  expect((await state(page)).edit[F.VCA_LEVEL], 'reading never changes the value').toBe(byte);
+  return { panel: (await loc.getAttribute('aria-valuetext')) ?? '', tooltip, typed };
+}
+
+test('AC-P5.1 VCA LEVEL at bytes 0, 64, 127: 60 mode is centre-zero (-5.0, 0.0, +5.0 on a −5…+5 scale), 106 mode unchanged (C-4)', async ({
+  page,
+}) => {
+  await openAndStart(page);
+  const ticks = (id: string) => page.getByTestId(`scale-${id}`).locator('text');
+  const signed = ['−5', '−4', '−3', '−2', '−1', '0', '+1', '+2', '+3', '+4', '+5']; // bottom to top
+  const plain = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+  await expect(ticks('vca-level')).toHaveText(signed);
+  await expect(ticks('env-a'), 'every other slider keeps 0–10').toHaveText(plain);
+  for (const [byte, v, db] of [
+    [0, '-5.0', '-inf dB'],
+    [64, '0.0', '-6.0 dB'],
+    [127, '+5.0', '+0.0 dB'],
+  ] as const) {
+    const want = `VCA LEVEL ${v} = ${db}`;
+    expect(await vcaLevelShown(page, byte), `60 mode, byte ${byte}`).toEqual({ panel: want, tooltip: want, typed: v });
+  }
+
+  await setMode(page, '106');
+  await expect(ticks('vca-level')).toHaveText(plain);
+  for (const [byte, v, db] of [
+    [0, '0.0', '-inf dB'],
+    [64, '5.0', '-6.0 dB'],
+    [127, '10.0', '+0.0 dB'],
+  ] as const) {
+    const want = `VCA LEVEL ${v} = ${db}`;
+    expect(await vcaLevelShown(page, byte), `106 mode, byte ${byte}`).toEqual({ panel: want, tooltip: want, typed: v });
+  }
 });
 
 test('AC-S3.3 web with mocked MIDI: CC74 64 injected → the FREQ slider shows 5.0 within 100 ms', async ({ page }) => {

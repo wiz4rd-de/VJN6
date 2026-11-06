@@ -147,6 +147,16 @@ export function sliderV(byte: number): string {
   return fixed(byte / 12.7, 1);
 }
 
+/**
+ * 60 VCA LEVEL (centre-zero, C-4): byte / 12.7 - 5 with one decimal, the sign only on a non-zero
+ * rounded value: "-5.0", "0.0" (bytes 63 and 64), "+2.0".
+ */
+export function vcaLevel60V(byte: number): string {
+  const t = roundAway((byte / 12.7 - 5.0) * 10.0);
+  if (t === 0) return '0.0';
+  return (t > 0 ? '+' : '-') + digits(t > 0 ? t : -t, 1);
+}
+
 /** Master tune in cents, one decimal with sign: "+10.2". */
 export function tuneV(byte: number): string {
   return signedFixed((byte - 64) * TUNE_CENTS_PER_STEP, 1);
@@ -251,9 +261,14 @@ export function perfEngineValue(perf: number, v: number, is106: boolean): string
   }
 }
 
-/** The panel's v for a field: position 0-3 for HPF, byte/12.7 otherwise. */
-export function fieldV(field: number, byte: number): string {
-  return field === Field.HPF ? String(byte < 4 ? byte : 0) : sliderV(byte);
+/**
+ * The panel's v for a field in the active mode: position 0-3 for HPF, the signed v of the 60 VCA LEVEL,
+ * byte/12.7 otherwise.
+ */
+export function fieldV(field: number, byte: number, is106: boolean): string {
+  if (field === Field.HPF) return String(byte < 4 ? byte : 0);
+  if (field === Field.VCA_LEVEL && !is106) return vcaLevel60V(byte);
+  return sliderV(byte);
 }
 
 /** The panel's v for a knob: cents for TUNE, byte/12.7 otherwise. */
@@ -263,7 +278,7 @@ export function perfV(perf: number, value: number): string {
 
 /** R-P5 tooltip: `<legend> <v> = <engine value>`. */
 export function fieldTooltip(legend: string, field: number, byte: number, is106: boolean, ctx: readonly number[]): string {
-  return `${legend} ${fieldV(field, byte)} = ${fieldEngineValue(field, byte, is106, ctx)}`;
+  return `${legend} ${fieldV(field, byte, is106)} = ${fieldEngineValue(field, byte, is106, ctx)}`;
 }
 
 export function perfTooltip(legend: string, perf: number, value: number, is106: boolean): string {
@@ -273,10 +288,16 @@ export function perfTooltip(legend: string, perf: number, value: number, is106: 
 // ---- typed entry (R-U1) ----
 
 /**
- * Parses a typed value. Sliders and knobs: round(v * 12.7); TUNE: cents -> byte; HPF: position.
+ * Parses a typed value. Sliders and knobs: round(v * 12.7); the 60 VCA LEVEL ('vca60'): v clamped to
+ * -5...+5, then round((v + 5) * 12.7); TUNE: cents -> byte; HPF: position.
  * Returns null for anything that is not a number (the entry reverts); out-of-range values clamp.
  */
-export function parseTyped(kind: 'byte' | 'tune' | 'hpf', text: string, min: number, max: number): number | null {
+export function parseTyped(
+  kind: 'byte' | 'vca60' | 'tune' | 'hpf',
+  text: string,
+  min: number,
+  max: number,
+): number | null {
   const t = text.trim();
   if (t === '' || !/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return null;
   const v = Number(t);
@@ -284,6 +305,7 @@ export function parseTyped(kind: 'byte' | 'tune' | 'hpf', text: string, min: num
   let b: number;
   if (kind === 'tune') b = roundAway(v / TUNE_CENTS_PER_STEP) + 64;
   else if (kind === 'hpf') b = roundAway(v);
+  else if (kind === 'vca60') b = roundAway((Math.min(5.0, Math.max(-5.0, v)) + 5.0) * 12.7);
   else b = roundAway(v * 12.7);
   if (b < min) b = min;
   if (b > max) b = max;
@@ -368,8 +390,8 @@ export const HOST_PARAMS: readonly HostParam[] = (() => {
 
 export const NUM_HOST_PARAMS = 40;
 
-/** Host value string for a native value (§4.8, R-P6). */
-export function hostValueString(index: number, value: number): string {
+/** Host value string for a native value in the active mode (§4.8, R-P6); only p_vca_level differs. */
+export function hostValueString(index: number, value: number, is106: boolean): string {
   const p = HOST_PARAMS[index];
   if (p.isChoice) {
     const i = value - p.min;
@@ -378,10 +400,11 @@ export function hostValueString(index: number, value: number): string {
   }
   if (index === NUM_HOST_PARAMS - 1) return tuneV(value);
   if (index === NUM_HOST_PARAMS - 2) return value > 0 ? '+' + String(value) : String(value);
-  return sliderV(value);
+  // the 16 slider parameters have their field's index (p_vca_level = B10)
+  return index === Field.VCA_LEVEL && !is106 ? vcaLevel60V(value) : sliderV(value);
 }
 
-/** Key transpose as shown in the KEY TRANSPOSE tooltip: "+3", "0", "-12". */
+/** Key transpose as shown in the KEY TRANSPOSE tooltip (106 mode): "+3", "0", "-12". */
 export function keyTransposeV(value: number): string {
-  return hostValueString(NUM_HOST_PARAMS - 2, value);
+  return hostValueString(NUM_HOST_PARAMS - 2, value, true);
 }
