@@ -577,7 +577,10 @@ bool Core::setPerf(int p, int v, Origin o) {
   emit(e);
   markDirty();
   switch (p) {
-    case P_KEY_MODE: engine_.keyModeChanged(); break;
+    case P_KEY_MODE:
+      // a 106 setting: no effect in 60 mode (§4.2); entering 106 mode releases everything anyway (F-12)
+      if (mode() == Mode::J106) engine_.keyModeChanged();
+      break;
     case P_HOLD: engine_.holdChanged(v != 0); break;
     case P_ARP_ON: engine_.arpChanged(v != 0); break;
     case P_MIDI_CHANNEL:
@@ -846,6 +849,9 @@ void Core::applyBulk(Bulk& b) {
       for (int p = 0; p < P_COUNT; ++p) setPerf(p, s.perf.v[p], Origin::Load);
       if (res == BlobResult::Ok)
         for (int k = 0; k < S_COUNT; ++k) setSetting(k, s.settings.v[k], Origin::Load);
+      // a mode change above recomputes the pending bank; the saved one is part of the state (§4.7)
+      st_.pendingBank = s.pendingBank;
+      st_.pendingGroup = s.pendingGroup;
       engine_.holdChanged(st_.perf.v[P_HOLD] != 0);
       ++bankVersion_;
       Event e;
@@ -1191,6 +1197,9 @@ void Core::txParamForField(int f) {
 }
 
 void Core::txDump(uint8_t type, int pp, const Patch& p) {
+  // A dump carries every parameter: F0 41 32 values still held back by the 10 ms limit are superseded
+  // and must not reach the receiver after it (they would overwrite the dumped patch there).
+  for (int c = 0; c <= 0x11; ++c) txPending_[c] = false;
   uint8_t m[24];
   sysex::encodeDump(p, type, st_.perf.v[P_MIDI_CHANNEL] - 1, pp, m);
   tx(m, 24);
