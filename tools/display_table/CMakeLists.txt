@@ -1,0 +1,2 @@
+add_executable(vjn6_display_table main.cpp)
+target_link_libraries(vjn6_display_table PRIVATE vjn6_core_internal)

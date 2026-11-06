@@ -22,6 +22,7 @@ if(VJN6_BUILD_TESTS)
   add_subdirectory(third_party/Catch2 EXCLUDE_FROM_ALL)
   add_subdirectory(tests)
   add_subdirectory(tools/bench)
+  add_subdirectory(tools/display_table)
 endif()
 
 if(VJN6_BUILD_PLUGIN AND NOT EMSCRIPTEN AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/plugin/CMakeLists.txt")
