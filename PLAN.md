@@ -68,3 +68,22 @@ R-E8 table LFO, R-E11 portamento and lever read)
 ## Slice 9 — Delivery
 - CI workflows (§15.1, within the owner's CI rules), README, docs/LICENSES.md, docs/STATE.md,
   `tools/capture/`, full-suite run, benchmarks, manual walk-through of §6 in both modes, REPORT.md.
+
+## v3.2 — Juno-60 corrections (VJN6-J60-CORRECTIONS-KICKOFF.md)
+
+Branch `develop/j60-corrections` (from `develop/vjn6` at 209a8ab). 60 mode only; 106 mode must stay
+bit-identical apart from the default-bank expectations of C-8. Before any change, the 106 baseline (full
+native, plugin, WASM, Vitest and Playwright results, the 24 106-mode golden hashes, the 106 rows of the
+display table and the 106 screenshots) is recorded from 209a8ab. SPEC.md first (v3.2 changelog), then each C
+item with its code and tests, one commit per item with every local gate green.
+
+| Item | Code | Tests |
+| --- | --- | --- |
+| C-1 square wave (no change) | SPEC R-E3 sentence only | existing AC-E3.3 / AC-E3.5 |
+| C-2 no RANGE in 60 mode | `core/engine/engine.cpp` (`Engine::sw` reads W0 as 1 in 60 mode); `core/core/core.cpp` (RANGE press ignored and RANGE LEDs off in 60 mode); `ui/src/panel/layout.ts` (RANGE buttons and legend 106 only, the gap left as empty panel) | AC-E3.1 (`tests/engine/test_e1_e3.cpp`); AC-P1.1 (`tests/panel/test_panel.cpp`, `ui/e2e/panel.spec.ts`); AC-P4.1 60 rows (`tests/panel/test_led_matrix.cpp`); AC-E1.3 `BASS-60-*` and `SFX-60-*` hashes regenerated; AC-SC1 60 panels |
+| C-3 octave transpose D/N/U | `core/panel/display.cpp` (host strings); `ui/src/panel/layout.ts` (switch labels U/N/D) | AC-PL2 (`plugin/tests/test_parameters.cpp`); `tests/golden/display_table.json` host rows; Vitest `format.test.ts`; AC-SC1 60 panels |
+| C-4 60 VCA LEVEL −5…+5 | `core/panel/display.cpp` (mode-aware slider v, host string and parse); `tools/display_table`; `plugin/source/HostParams.cpp`, `PluginProcessor.cpp` (strings follow the mode); `ui/src/panel/format.ts`, `Slider.svelte`, typed entry (tick scale, v, round((v + 5) × 12.7)) | AC-P5.1 (core display test, `display_table.json` 60 rows, Vitest, e2e); AC-PL2; AC-U1.1 (`ui/e2e/interaction.spec.ts`); AC-SC1 60 panels |
+| C-5 60 VCF order | `ui/src/panel/layout.ts` (per-mode positions and Tab order) | AC-P1.1 e2e; AC-U3.1 (`ui/e2e/keyboard-a11y.spec.ts`); AC-SC1 60 panels |
+| C-6 60 chorus OFF / I / II + I+II | `core/core/core.cpp` (radio buttons, CHORUS I ↔ II combination press); `ui/src/panel/layout.ts`, `PanelButton.svelte` (OFF in both modes, no LED in 60, Shift+click tooltips) | AC-P1.1, AC-U4.1 (core + e2e); AC-P4.1 60 chorus rows; AC-U3.1; AC-SC1 60 panels |
+| C-7 factory bank | `banks/j60-factory-chart.csv`; `tools/make_default_bank.py` (chart → `banks/default/0NN-*.json` for slots 1–56, originals moved to 58–65, `banks/vjn6-default.vjn6bank`, `core/state/default_bank.inc`, `docs/FACTORY_BANK.md`, `--check`) | new AC-D7.2; AC-D7.1 names; tests that relied on the old slot layout get a fixture bank with that layout (assertions unchanged) or the new names (e2e, plugin); AC-SC1 bank-manager screenshots |
+| C-8 tests | spread over the items above; AC-E1.3 and the §9.1 benchmark select the originals by content | full native + WASM suite, plugin tests, Vitest, Playwright (Chromium + WebKit), Linux screenshot check, benchmarks, pluginval |
