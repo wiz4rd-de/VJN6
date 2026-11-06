@@ -115,7 +115,7 @@ const ORDER: Record<'60' | '106', string[]> = {
     'lfo-rate', 'lfo-delay', 'lfo-mode',
     'dco-lfo', 'dco-pwm', 'pwm-mode', 'pulse', 'saw', 'sub', 'sub-level', 'noise', // no RANGE in 60 mode (C-2)
     'hpf',
-    'vcf-freq', 'vcf-res', 'vcf-env', 'vcf-lfo', 'vcf-kybd', 'vcf-pol',
+    'vcf-freq', 'vcf-res', 'vcf-pol', 'vcf-env', 'vcf-lfo', 'vcf-kybd', // the 60 VCF order (C-5)
     'vca-mode', 'vca-level',
     'env-a', 'env-d', 'env-s', 'env-r',
     'chorus-i', 'chorus-ii',

@@ -317,3 +317,16 @@ Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, 
   tooltip and the host; it accepts ASCII `+`/`-` (not U+2212). The UI's formatter functions take the mode as
   a required argument, so no caller can fall back to the 106 form; the scale carries
   `data-testid="scale-<id>"` for AC-P5.1. Screenshots: `panel-60-*` only.
+
+### C-5 60 VCF order
+- **Conflict with the §5.2 position rule:** C-5 puts the polarity switch after RES in 60 mode while 106
+  mode keeps it last, so the switch and the ENV, LFO and KYBD sliders cannot keep their positions across a
+  mode switch. The more specific rule (C-5) wins; SPEC §5.2 now names the VCF box as the one exception.
+  FREQ and RES do not move.
+- **Geometry (60 mode):** FREQ 742, RES 778, polarity switch body x 815 (y 236 like the other switches),
+  ENV 856, LFO 892, KYBD 928 (track ends at 948, the right edge of the 106 polarity legend). The first idea
+  (switch 818, ENV 850) made the 40 px `POLARITY` legend overlap the ENV tick digits; these positions leave
+  ≈ 3 px to the RES cap and ≈ 4 px to the ENV digits. The 60 legend stays `POLARITY`.
+- **Implementation:** the polarity switch and the ENV/LFO/KYBD sliders have one definition per mode with the
+  same ids (like the 60 HPF switch and the 106 HPF slider), so `CONTROLS` stays the Tab order of each mode
+  (R-U3: 60 FREQ, RES, polarity, ENV, LFO, KYBD; 106 unchanged). Screenshots: `panel-60-*` only.

@@ -1,7 +1,8 @@
 // Front-panel layout (§5.2): the section boxes and every control with its position in the
 // 1400 × 560 logical canvas. Both modes share this geometry; a control listed for one mode only is
-// drawn only in that mode, and controls both modes have stay where they are. The order of CONTROLS
-// is the Tab order (R-U3): sections left to right, then the memory row, then the right edge.
+// drawn only in that mode, and controls both modes have stay where they are, except in the VCF box
+// (C-5, see vcfDepths). The order of CONTROLS is the Tab order (R-U3): sections left to right, then the
+// memory row, then the right edge.
 
 import { Field, Led, Perf, type ButtonName } from '../protocol';
 
@@ -167,6 +168,32 @@ const MEM_CAP_Y = 494;
 const bankX = (i: number) => 206 + (i - 1) * 34;
 const patchX = (i: number) => 502 + (i - 1) * 34;
 
+/**
+ * The VCF box is §5.2's one exception to the shared-position rule (C-5): the 60 order is FREQ, RES,
+ * polarity switch, ENV, LFO, KYBD; the 106 order is FREQ, RES, ENV, LFO, KYBD, polarity switch. Each
+ * mode has its own defs (same ids, so state and tests address the same field) in its own order, which
+ * keeps CONTROLS the Tab order of both modes.
+ */
+const vcfDepths = (modes: ModeSet, x: number): SliderDef[] => [
+  { ...slider('vcf-env', 'VCF ENV', Field.VCF_ENV, 'ENV', x), modes },
+  { ...slider('vcf-lfo', 'VCF LFO', Field.VCF_LFO, 'LFO', x + 36), modes },
+  { ...slider('vcf-kybd', 'VCF KYBD', Field.VCF_KYBD, 'KYBD', x + 72), modes },
+];
+
+const vcfPolarity = (modes: ModeSet, x: number, positions: readonly SwitchPos[]): SwitchDef => ({
+  kind: 'switch',
+  id: 'vcf-pol',
+  modes,
+  aria: 'VCF POLARITY',
+  target: { field: Field.VCF_POL },
+  positions,
+  labels: 'ends',
+  legend: 'POLARITY',
+  legendAt: 'above',
+  x,
+  y: 236,
+});
+
 function bankCombo(i: number): string | undefined {
   if (i === 1) return 'Shift+click with BANK 5 lit: bank 6';
   if (i === 2) return 'Shift+click with BANK 5 lit: bank 7';
@@ -326,29 +353,16 @@ export const CONTROLS: readonly ControlDef[] = [
   // ---- VCF ----
   slider('vcf-freq', 'VCF FREQ', Field.VCF_FREQ, 'FREQ', 742),
   slider('vcf-res', 'VCF RES', Field.VCF_RES, 'RES', 778),
-  slider('vcf-env', 'VCF ENV', Field.VCF_ENV, 'ENV', 814),
-  slider('vcf-lfo', 'VCF LFO', Field.VCF_LFO, 'LFO', 850),
-  slider('vcf-kybd', 'VCF KYBD', Field.VCF_KYBD, 'KYBD', 886),
-  {
-    kind: 'switch',
-    id: 'vcf-pol',
-    modes: 'both',
-    aria: 'VCF POLARITY',
-    target: { field: Field.VCF_POL },
-    positions: [
-      { value: 0, label: '+' },
-      { value: 1, label: '−' },
-    ],
-    positions106: [
-      { value: 0, label: 'NORMAL' },
-      { value: 1, label: 'INVERTED' },
-    ],
-    labels: 'ends',
-    legend: 'POLARITY',
-    legendAt: 'above',
-    x: 922,
-    y: 236,
-  },
+  vcfPolarity('60', 815, [
+    { value: 0, label: '+' },
+    { value: 1, label: '−' },
+  ]),
+  ...vcfDepths('60', 856),
+  ...vcfDepths('106', 814),
+  vcfPolarity('106', 922, [
+    { value: 0, label: 'NORMAL' },
+    { value: 1, label: 'INVERTED' },
+  ]),
 
   // ---- VCA ----
   {

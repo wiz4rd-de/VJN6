@@ -1,6 +1,6 @@
-// Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, 60 chorus toggles), AC-U4.1
-// (combination press), AC-P5.1 (UI part: the centre-zero 60 VCA LEVEL) and AC-S3.3 (a mocked MIDI CC is
-// visible within 100 ms).
+// Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, the 60 VCF order, 60 chorus
+// toggles), AC-U4.1 (combination press), AC-P5.1 (UI part: the centre-zero 60 VCA LEVEL) and AC-S3.3
+// (a mocked MIDI CC is visible within 100 ms).
 import type { Page } from '@playwright/test';
 import { ctl, expect, F, midi, openAndStart, P, setMode, state, test, waitForState, type CoreState } from './fixtures';
 
@@ -194,6 +194,31 @@ async function pressButtons(page: Page, mode: '60' | '106'): Promise<void> {
   await waitForState(page, (s) => !s.writeArmed, 'WRITE again cancels');
 }
 
+/** §5.2 VCF order per mode (C-5): the one box whose shared controls sit at different x in the two modes. */
+const VCF_ORDER = {
+  '60': ['vcf-freq', 'vcf-res', 'vcf-pol', 'vcf-env', 'vcf-lfo', 'vcf-kybd'],
+  '106': ['vcf-freq', 'vcf-res', 'vcf-env', 'vcf-lfo', 'vcf-kybd', 'vcf-pol'],
+};
+
+/** The VCF controls left to right, in DOM order (= Tab order, R-U3), and their logical boxes. */
+async function vcfLayout(page: Page): Promise<{ byX: string[]; dom: string[]; boxes: Record<string, number[]> }> {
+  return page.evaluate(() => {
+    const stage = document.querySelector('[data-testid="stage"]')!;
+    const scale = Number(stage.getAttribute('data-scale'));
+    const sr = stage.getBoundingClientRect();
+    const els = [...document.querySelectorAll('[data-testid^="ctl-vcf-"]')].filter(
+      (e) => !e.getAttribute('data-testid')!.includes('-pos-'),
+    );
+    const boxes: Record<string, number[]> = {};
+    for (const e of els) {
+      const r = e.getBoundingClientRect();
+      boxes[e.getAttribute('data-testid')!.slice(4)] = [(r.left - sr.left) / scale, (r.right - sr.left) / scale];
+    }
+    const dom = Object.keys(boxes);
+    return { dom, byX: [...dom].sort((a, b) => boxes[a][0] - boxes[b][0]), boxes };
+  });
+}
+
 test.describe('AC-P1.1 control map (UI part)', () => {
   for (const mode of ['60', '106'] as const) {
     test(`AC-P1.1 ${mode} mode: every control is present only in its mode and moves its §4.1/§4.2 field or action`, async ({
@@ -265,6 +290,30 @@ test.describe('AC-P1.1 control map (UI part)', () => {
     await setMode(page, '106');
     await expect(ctl(page, 'range-16')).toHaveAttribute('data-lit', 'true');
     expect((await state(page)).edit[F.RANGE]).toBe(0);
+  });
+
+  test('AC-P1.1 VCF order per mode (C-5): 60 FREQ, RES, polarity, ENV, LFO, KYBD; 106 FREQ, RES, ENV, LFO, KYBD, polarity; also after mode switches', async ({
+    page,
+  }) => {
+    await openAndStart(page);
+    const seen: Record<string, Record<string, number[]>> = {};
+    for (const [k, mode] of (['60', '106', '60'] as const).entries()) {
+      if (k > 0) await setMode(page, mode);
+      const l = await vcfLayout(page);
+      expect(l.byX, `${mode} mode: left to right`).toEqual(VCF_ORDER[mode]);
+      expect(l.dom, `${mode} mode: DOM (Tab) order`).toEqual(VCF_ORDER[mode]);
+      for (const [id, [x0, x1]] of Object.entries(l.boxes)) {
+        expect(x0 >= 724 && x1 <= 954, `${mode} mode: ${id} inside the VCF box (${x0}–${x1})`).toBe(true);
+      }
+      if (seen[mode]) expect(l.boxes, `${mode} mode: the same positions after switching back`).toEqual(seen[mode]);
+      seen[mode] = l.boxes;
+    }
+    // FREQ and RES are shared and do not move
+    for (const id of ['vcf-freq', 'vcf-res']) expect(seen['60'][id], id).toEqual(seen['106'][id]);
+    // the moved switch still writes W6 (§4.1)
+    await ctl(page, 'vcf-pol-pos-1').click();
+    await waitForState(page, (s) => s.edit[F.VCF_POL] === 1, 'polarity − → W6 = 1');
+    await expect(ctl(page, 'vcf-pol')).toHaveAttribute('aria-valuetext', '−');
   });
 
   test('AC-P1.1 60 mode: the chorus I and II buttons toggle off / I / II / I+II', async ({ page }) => {
