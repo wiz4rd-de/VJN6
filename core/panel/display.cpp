@@ -204,7 +204,7 @@ std::vector<HostParamInfo> buildParams() {
   p.push_back({"f_arp_mode", "Arpeggio mode", true, 0, 2, {"UP", "U&D", "DOWN"}});
   p.push_back({"f_arp_range", "Arpeggio range", true, 1, 3, {"1", "2", "3"}});
   p.push_back({"f_arp_rate", "Arpeggio rate", false, 0, 127, {}});
-  p.push_back({"f_oct_transpose", "Octave transpose", true, 0, 2, {"L", "N", "H"}});
+  p.push_back({"f_oct_transpose", "Octave transpose", true, 0, 2, {"D", "N", "U"}});
   p.push_back({"f_key_transpose", "Key transpose", false, -12, 12, {}});
   p.push_back({"g_tune", "Master tune", false, 0, 127, {}});
   return p;

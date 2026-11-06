@@ -60,7 +60,7 @@ std::vector<std::string> choicesOf(int i) {
     case 31: return {"AUTO", "MANUAL"};
     case 34: return {"UP", "U&D", "DOWN"};
     case 35: return {"1", "2", "3"};
-    case 37: return {"L", "N", "H"};
+    case 37: return {"D", "N", "U"};  // DOWN / NORMAL / UP (v3.2 C-3)
     default: return {};
   }
 }

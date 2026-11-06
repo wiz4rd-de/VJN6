@@ -184,9 +184,9 @@ export const CONTROLS: readonly ControlDef[] = [
     aria: 'OCTAVE TRANSPOSE',
     target: { perf: Perf.OCT_TRANSPOSE },
     positions: [
-      { value: 2, label: 'H' },
+      { value: 2, label: 'U' },
       { value: 1, label: 'N' },
-      { value: 0, label: 'L' },
+      { value: 0, label: 'D' },
     ],
     labels: 'side',
     legend: 'OCTAVE\nTRANSPOSE',

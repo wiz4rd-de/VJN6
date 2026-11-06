@@ -137,7 +137,7 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   repeats ("LFO RATE", "VCF FREQ", "ENV A", "BENDER DCO", "RANGE 16′", "GROUP A"); the panel shows the
   short legend under the section header (R-U3, R-P5).
 - **Switch order**: named positions top to bottom in the spec's order (AUTO/MAN, LFO/MAN/ENV, +/−, ENV/GATE,
-  UP/U&D/DOWN); graded positions put the highest at the top (HPF 3…0 per §5.2, OCTAVE H/N/L, ARP RANGE 3/2/1);
+  UP/U&D/DOWN); graded positions put the highest at the top (HPF 3…0 per §5.2, OCTAVE U/N/D (H/N/L before v3.2 C-3), ARP RANGE 3/2/1);
   Up moves to the position visually above.
 - **Drag/wheel** (R-U1): distances and the lever's ±60 px are logical canvas px (screen px ÷ scale); one
   wheel event is one step whatever its delta; the 106 HPF slider snaps one position per (300 − 14)/3 px.
@@ -282,3 +282,11 @@ Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, 
   `aria-hidden`), so the e2e tests can check which legends each mode draws.
 - **Screenshots:** only `panel-60-50/100/200` changed (the 960 px overlays cover the DCO box, so the 60
   bank-manager and Settings shots did not change); every 106 PNG is byte-identical.
+
+### C-3 Octave transpose D/N/U
+- Only the labels change: `f_oct_transpose` host strings `D`, `N`, `U` (§4.8) and the switch legends; the
+  values (0 = D −12, 1 = N, 2 = U +12) and the default (1) are unchanged, so saved state stays compatible.
+  `tests/golden/display_table.json` changed in its two `f_oct_transpose` host rows only.
+- The switch keeps the "graded positions put the highest at the top" rule (UI section): U, N, D from top to
+  bottom, Up moves towards U. Screenshots: `panel-60-*`, plus `settings-60` and `bank-manager-60`, where the
+  switch shows dimmed behind the overlay; every 106 PNG is byte-identical.

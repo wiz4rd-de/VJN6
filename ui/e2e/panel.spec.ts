@@ -213,6 +213,11 @@ test.describe('AC-P1.1 control map (UI part)', () => {
         await expect(ctl(page, 'pwm-mode-pos-2')).toHaveText('ENV');
         await expect(ctl(page, 'vcf-pol-pos-1')).toHaveText('−');
         await expect(page.getByTestId('text-range'), 'no RANGE legend in the DCO box (C-2)').toHaveCount(0);
+        // OCTAVE TRANSPOSE D/N/U (C-3), top to bottom U, N, D
+        await expect(page.locator('[data-testid^="ctl-oct-transpose-pos-"]')).toHaveText(['U', 'N', 'D']);
+        for (const [v, label] of [[2, 'U'], [1, 'N'], [0, 'D']] as const) {
+          await expect(ctl(page, `oct-transpose-pos-${v}`)).toHaveText(label);
+        }
       } else {
         await expect(page.getByTestId('text-range')).toHaveText('RANGE');
         await expect(ctl(page, 'hpf')).not.toHaveAttribute('data-field', /.*/); // 4-position slider

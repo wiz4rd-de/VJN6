@@ -359,7 +359,7 @@ export const HOST_PARAMS: readonly HostParam[] = (() => {
     choice('f_arp_mode', 'Arpeggio mode', 0, ['UP', 'U&D', 'DOWN']),
     choice('f_arp_range', 'Arpeggio range', 1, ['1', '2', '3']),
     int('f_arp_rate', 'Arpeggio rate', 0, 127),
-    choice('f_oct_transpose', 'Octave transpose', 0, ['L', 'N', 'H']),
+    choice('f_oct_transpose', 'Octave transpose', 0, ['D', 'N', 'U']),
     int('f_key_transpose', 'Key transpose', -12, 12),
     int('g_tune', 'Master tune', 0, 127),
   );

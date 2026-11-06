@@ -223,8 +223,12 @@ test('AC-U1.1 switches: a click on a position sets the field (labels and body)',
   await expectValue(page, ctl(page, 'vca-mode'), { field: F.VCA_MODE }, 0, 'VCA ENV');
   await ctl(page, 'hpf-pos-2').click();
   await expectValue(page, ctl(page, 'hpf'), { field: F.HPF }, 2, 'HPF switch 2');
-  await ctl(page, 'oct-transpose-pos-2').click(); // H
-  await expectValue(page, ctl(page, 'oct-transpose'), { perf: P.OCT_TRANSPOSE }, 2, 'OCTAVE TRANSPOSE H');
+  await ctl(page, 'oct-transpose-pos-2').click(); // U
+  await expectValue(page, ctl(page, 'oct-transpose'), { perf: P.OCT_TRANSPOSE }, 2, 'OCTAVE TRANSPOSE U');
+  await expect(ctl(page, 'oct-transpose')).toHaveAttribute('aria-valuetext', 'U');
+  await ctl(page, 'oct-transpose-pos-0').click(); // D
+  await expectValue(page, ctl(page, 'oct-transpose'), { perf: P.OCT_TRANSPOSE }, 0, 'OCTAVE TRANSPOSE D');
+  await expect(ctl(page, 'oct-transpose')).toHaveAttribute('aria-valuetext', 'D');
 
   // the switch body: each 16 px position from the top (PWM: LFO / MAN / ENV)
   const pwm = ctl(page, 'pwm-mode');
