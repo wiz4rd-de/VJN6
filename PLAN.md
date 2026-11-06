@@ -1,5 +1,7 @@
 # VJN6 build plan
 
+Status 2026-11-06: all slices done and committed on `develop/vjn6`; results in REPORT.md.
+
 Vertical slices in the order recommended by SPEC.md §14, each with the requirement and acceptance IDs it
 satisfies. A slice is done when its tests pass natively (and under WASM once slice 5 exists) and it is committed.
 
