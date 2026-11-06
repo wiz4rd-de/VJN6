@@ -72,4 +72,54 @@ struct Vcf {
   }
 };
 
+// Six VCFs advanced together: the same arithmetic as Vcf::process for each filter, interleaved step by
+// step across the voices so that their independent division chains overlap (bit-identical results).
+inline void processSix(Vcf* const* f, const double* x, const double* g, double kfb, double gin, double dn,
+                       double* out) {
+  constexpr int N = 6;
+  constexpr double Vf = k::kVfb;
+  constexpr double invVs = 1.0 / k::kVsat;
+  constexpr double invVf = 1.0 / k::kVfb;
+  double a[N][4], b[N][4], A[N], B[N], u[N], y[N];
+  for (int i = 0; i < 4; ++i) {
+    for (int v = 0; v < N; ++v) {
+      const double G = g[v] * f[v]->tg[i];
+      const double inv = 1.0 / (1.0 + G);
+      a[v][i] = G * inv;
+      b[v][i] = f[v]->s[i] * inv;
+    }
+  }
+  for (int v = 0; v < N; ++v) {
+    A[v] = a[v][0] * a[v][1] * a[v][2] * a[v][3];
+    B[v] = a[v][3] * (a[v][2] * (a[v][1] * b[v][0] + b[v][1]) + b[v][2]) + b[v][3];
+    u[v] = gin * x[v];
+    y[v] = (A[v] * u[v] + B[v]) / (1.0 + A[v] * kfb * f[v]->tfb);
+  }
+  for (int v = 0; v < N; ++v) {  // one Newton-Raphson step
+    const double t = dm::tanh(y[v] * invVf);
+    const double F = y[v] - A[v] * (u[v] - kfb * Vf * t) - B[v];
+    const double dF = 1.0 + A[v] * kfb * (1.0 - t * t);
+    y[v] -= F / dF;
+  }
+  double in[N];
+  for (int v = 0; v < N; ++v) in[v] = u[v] - kfb * Vf * dm::tanh(y[v] * invVf);
+  for (int i = 0; i < 4; ++i) {
+    for (int v = 0; v < N; ++v) {
+      Vcf& fv = *f[v];
+      const double yi = a[v][i] * in[v] + b[v][i];
+      fv.s[i] = 2.0 * yi - fv.s[i] + dn;
+      const double vv = (in[v] - yi) * invVs;
+      fv.tg[i] = Vcf::secant(2.0 * vv - fv.v1[i]);
+      fv.v2[i] = fv.v1[i];
+      fv.v1[i] = vv;
+      in[v] = yi;
+    }
+  }
+  for (int v = 0; v < N; ++v) {
+    f[v]->y4 = in[v];
+    f[v]->tfb = Vcf::secant(in[v] * invVf);
+    out[v] = in[v];
+  }
+}
+
 }  // namespace vjn6

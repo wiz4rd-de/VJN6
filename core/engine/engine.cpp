@@ -984,41 +984,86 @@ void Engine::arpChanged(bool on) {
 // ------------------------------------------------------------------------------------------------
 // rendering
 
-void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
-  const BlepTable& bt = *blep_;
-  const bool is106 = mode_ == Mode::J106;
-  const double var = settings_->v[S_VARIATION] / 100.0;
-  const double sawW = sw(W_SAW) ? (k::kSawPeak * (1.0 + vc.uSaw * k::kVarSawAmp * var)) : 0.0;
-  const double pulseW = sw(W_PULSE) ? k::kPulsePeak : 0.0;
-  const double subW = sw(W_SUB) ? k::kSubMax * byte(B_SUB_LEVEL) : 0.0;
-  const double noiseW = byte(B_NOISE);
-  const double dutyBase = k::kDutyCentre + vc.uDuty * k::kVarDuty * var;
-  const int pwmSrc = sw(W_PWM_SRC);
-  const double pwmAmt = byte(B_DCO_PWM);
-  const double pol = sw(W_VCF_POL) ? -1.0 : 1.0;
-  const double envOct = k::kEnvDepth60Oct * byte(B_VCF_ENV) * pol;
-  const bool gateMode = sw(W_VCA_MODE) == 1;
-  const double vcaGain = byte(B_VCA_LEVEL) * dm::dbToGain(vc.uVca * k::kVarVcaDb * var) * vc.velGain;
-  const double sawJump = is106 ? -2.0 * sawW : 2.0 * sawW;
-  const int hpf = sw(W_HPF);
-  const bool hpFlat = is106 ? hpf == 1 : hpf == 0;
-  const bool shelf = is106 && hpf == 0;
-  const double shelfK = dm::dbToGain(k::kShelfHfGainDb);
-  const double z1 = k::kShelfZero1Hz / k::kShelfPole1Hz, z2 = k::kShelfZero2Hz / k::kShelfPole2Hz;
-  const double rcA = 1.0 - dm::exp(-1.0 / (k::kRc106TauS * fo_));
-  const double gateStep = 1.0 / (k::kGateRampS * fo_);
-  const double S = byte(B_ENV_S);
-  const double incMin = k::kPitchMinHz60 / fo_, incMax = k::kCornerClampRatio;
-  const double fcMax = k::kCornerClampRatio * fo_;
-  const int iters = 1;
-  const double kfb = kfb_, gin = gin_;
-  const double dn = dn_;
-  EngineHooks& H = hooks;
-  const bool hv = (H.voice < 0 || H.voice == vi);
-  const bool capThis = H.voice == vi || (H.voice < 0 && vi == 0);
-  const long base = H.osPos;
+namespace {
+#if defined(_MSC_VER)
+#define VJN6_ALWAYS_INLINE __forceinline
+#else
+#define VJN6_ALWAYS_INLINE inline __attribute__((always_inline))
+#endif
+}  // namespace
 
-  for (int i = 0; i < nOs; ++i) {
+// Per-voice constants for one segment.
+struct Engine::VoiceCtx {
+  double sawW, pulseW, subW, noiseW, dutyBase, pwmAmt, envOct, vcaGain, sawJump;
+  bool hv, capThis;
+  int vi;
+};
+// Constants shared by all voices for one segment.
+struct Engine::SegCtx {
+  const BlepTable* bt;
+  bool is106, gateMode, hpFlat, shelf;
+  int pwmSrc, iters;
+  double shelfK, z1, z2, rcA, gateStep, S, incMin, incMax, fcMax, kfb, gin, dn;
+  long base;
+};
+
+void Engine::makeVoiceCtx(const Voice& vc, int vi, VoiceCtx& c) const {
+  const double var = settings_->v[S_VARIATION] / 100.0;
+  c.sawW = sw(W_SAW) ? (k::kSawPeak * (1.0 + vc.uSaw * k::kVarSawAmp * var)) : 0.0;
+  c.pulseW = sw(W_PULSE) ? k::kPulsePeak : 0.0;
+  c.subW = sw(W_SUB) ? k::kSubMax * byte(B_SUB_LEVEL) : 0.0;
+  c.noiseW = byte(B_NOISE);
+  c.dutyBase = k::kDutyCentre + vc.uDuty * k::kVarDuty * var;
+  c.pwmAmt = byte(B_DCO_PWM);
+  const double pol = sw(W_VCF_POL) ? -1.0 : 1.0;
+  c.envOct = k::kEnvDepth60Oct * byte(B_VCF_ENV) * pol;
+  c.vcaGain = byte(B_VCA_LEVEL) * dm::dbToGain(vc.uVca * k::kVarVcaDb * var) * vc.velGain;
+  c.sawJump = mode_ == Mode::J106 ? -2.0 * c.sawW : 2.0 * c.sawW;
+  c.hv = (hooks.voice < 0 || hooks.voice == vi);
+  c.capThis = hooks.voice == vi || (hooks.voice < 0 && vi == 0);
+  c.vi = vi;
+}
+
+void Engine::makeSegCtx(SegCtx& s) const {
+  s.bt = blep_;
+  s.is106 = mode_ == Mode::J106;
+  s.pwmSrc = sw(W_PWM_SRC);
+  s.gateMode = sw(W_VCA_MODE) == 1;
+  const int hpf = sw(W_HPF);
+  s.hpFlat = s.is106 ? hpf == 1 : hpf == 0;
+  s.shelf = s.is106 && hpf == 0;
+  s.shelfK = dm::dbToGain(k::kShelfHfGainDb);
+  s.z1 = k::kShelfZero1Hz / k::kShelfPole1Hz;
+  s.z2 = k::kShelfZero2Hz / k::kShelfPole2Hz;
+  s.rcA = 1.0 - dm::exp(-1.0 / (k::kRc106TauS * fo_));
+  s.gateStep = 1.0 / (k::kGateRampS * fo_);
+  s.S = byte(B_ENV_S);
+  s.incMin = k::kPitchMinHz60 / fo_;
+  s.incMax = k::kCornerClampRatio;
+  s.fcMax = k::kCornerClampRatio * fo_;
+  s.iters = 1;
+  s.kfb = kfb_;
+  s.gin = gin_;
+  s.dn = dn_;
+  s.base = hooks.osPos;
+}
+
+// One oversampled sample of one voice (DCO -> DC block -> HPF -> VCF -> VCA); returns its output.
+VJN6_ALWAYS_INLINE void Engine::stepVoiceA(Voice& vc, const VoiceCtx& c, const SegCtx& sc, int i, double& xOut, double& gOut) {
+  const BlepTable& bt = *sc.bt;
+  const bool is106 = sc.is106;
+  const double sawW = c.sawW, pulseW = c.pulseW, subW = c.subW, noiseW = c.noiseW, dutyBase = c.dutyBase;
+  const int pwmSrc = sc.pwmSrc;
+  const double pwmAmt = c.pwmAmt, envOct = c.envOct, vcaGain = c.vcaGain, sawJump = c.sawJump;
+  const bool gateMode = sc.gateMode, hpFlat = sc.hpFlat, shelf = sc.shelf;
+  const double shelfK = sc.shelfK, z1 = sc.z1, z2 = sc.z2, rcA = sc.rcA, gateStep = sc.gateStep, S = sc.S;
+  const double incMin = sc.incMin, incMax = sc.incMax, fcMax = sc.fcMax;
+  const int iters = sc.iters;
+  const double kfb = sc.kfb, gin = sc.gin, dn = sc.dn;
+  EngineHooks& H = hooks;
+  const bool hv = c.hv, capThis = c.capThis;
+  const int vi = c.vi;
+  const long base = sc.base;
     // ---- envelope and gate
     if (vc.forceEnv) {
       vc.env = vc.forcedEnv;
@@ -1042,13 +1087,7 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
       vc.gate -= gateStep;
       if (vc.gate < 0.0) vc.gate = 0.0;
     }
-    double envV;
-    if (is106) {
-      vc.envRc += (vc.env - vc.envRc) * rcA + dn;
-      envV = vc.envRc;
-    } else {
-      envV = vc.env;
-    }
+    if (is106) vc.envRc += (vc.env - vc.envRc) * rcA + dn;
     // ---- pitch
     double inc;
     if (is106) {
@@ -1158,7 +1197,27 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
     }
     const double fc = vc.lastFc;
     const double g = vc.lastG;
-    double y = vc.vcf.process(x, g, kfb, gin, iters, dn);
+    xOut = x;
+    gOut = g;
+    (void)fc;
+    (void)kfb;
+    (void)gin;
+    (void)iters;
+    (void)gateMode;
+    (void)vcaGain;
+    (void)vi;
+}
+
+// The part of the voice after the VCF (VCA, captures); returns the voice output.
+VJN6_ALWAYS_INLINE double Engine::stepVoiceC(Voice& vc, const VoiceCtx& c, const SegCtx& sc, int i, double y) {
+  const bool is106 = sc.is106, gateMode = sc.gateMode;
+  const double vcaGain = c.vcaGain;
+  EngineHooks& H = hooks;
+  const bool hv = c.hv, capThis = c.capThis;
+  const int vi = c.vi;
+  const long base = sc.base;
+  const double envV = is106 ? vc.envRc : vc.env;
+  const double fc = vc.lastFc;
     if (hv && H.injVcfOut) y = H.injVcfOut[base + i];
     if (capThis && H.capVcfOut) H.capVcfOut[base + i] = y;
     if (capThis && H.capCut) H.capCut[base + i] = fc;
@@ -1176,12 +1235,7 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
     const double vout = y * gv * vcaGain;
     if (capThis && H.capVoiceOut) H.capVoiceOut[base + i] = vout;
     if (H.capAllVoices) H.capAllVoices[(base + i) * 6 + vi] = vout;
-    bus[i] += vout;
-  }
-  // free detection (R-E11 glossary)
-  if (vc.active && !vc.held) {
-    if (gateMode ? vc.gate <= 0.0 : (vc.stage == 3 && vc.env < k::kFreeLevel)) vc.active = false;
-  }
+    return vout;
 }
 
 void Engine::renderSegment(float* L, float* R, int n) {
@@ -1210,8 +1264,28 @@ void Engine::renderSegment(float* L, float* R, int n) {
       lfoPwm_[m] = lfoPwmVal_;
     }
   }
-  for (int m = 0; m < nOs; ++m) bus_[m] = 0.0;
-  for (int vi = 0; vi < k::kVoices; ++vi) renderVoice(v_[vi], vi, nOs, bus_.data());
+  // all six voices advance together sample by sample (independent dependency chains overlap);
+  // the bus sums them in voice order
+  SegCtx sc;
+  makeSegCtx(sc);
+  VoiceCtx vctx[k::kVoices];
+  for (int vi = 0; vi < k::kVoices; ++vi) makeVoiceCtx(v_[vi], vi, vctx[vi]);
+  Vcf* filters[k::kVoices];
+  for (int vi = 0; vi < k::kVoices; ++vi) filters[vi] = &v_[vi].vcf;
+  for (int m = 0; m < nOs; ++m) {
+    double xs[k::kVoices], gs[k::kVoices], ys[k::kVoices];
+    for (int vi = 0; vi < k::kVoices; ++vi) stepVoiceA(v_[vi], vctx[vi], sc, m, xs[vi], gs[vi]);
+    processSix(filters, xs, gs, sc.kfb, sc.gin, sc.dn, ys);
+    double acc = 0.0;
+    for (int vi = 0; vi < k::kVoices; ++vi) acc += stepVoiceC(v_[vi], vctx[vi], sc, m, ys[vi]);
+    bus_[m] = acc;
+  }
+  for (Voice& vc : v_) {
+    // free detection (R-E11 glossary)
+    if (vc.active && !vc.held) {
+      if (sc.gateMode ? vc.gate <= 0.0 : (vc.stage == 3 && vc.env < k::kFreeLevel)) vc.active = false;
+    }
+  }
   if (os_ == 2) {
     for (int i = 0; i < n; ++i) dry_[i] = decFinal_.decimate(bus_[2 * i], bus_[2 * i + 1]);
   } else {

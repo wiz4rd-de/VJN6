@@ -206,7 +206,12 @@ class Engine {
   void arpStopNote();
 
   double voiceCutoffBase60(const Voice& vc) const;  // log2 Hz incl. c_cal and variation
-  void renderVoice(Voice& vc, int vi, int nOs, double* bus);
+  struct VoiceCtx;
+  struct SegCtx;
+  void makeVoiceCtx(const Voice& vc, int vi, VoiceCtx& c) const;
+  void makeSegCtx(SegCtx& s) const;
+  void stepVoiceA(Voice& vc, const VoiceCtx& c, const SegCtx& sc, int i, double& xOut, double& gOut);
+  double stepVoiceC(Voice& vc, const VoiceCtx& c, const SegCtx& sc, int i, double y);
 
   // configuration
   double fs_ = 48000.0, fo_ = 96000.0;
