@@ -135,6 +135,15 @@ inline double tanh(double x) {
   return num / den;
 }
 
+// tanh(x)/x from the same [9/8] Pade approximant (one division, no special case at 0).
+inline double tanhOverX(double x) {
+  if (x >= 6.3 || x <= -6.3) return 1.0 / (x < 0 ? -x : x);
+  const double x2 = x * x;
+  const double num = 34459425.0 + x2 * (4729725.0 + x2 * (135135.0 + x2 * (990.0 + x2)));
+  const double den = 34459425.0 + x2 * (16216200.0 + x2 * (945945.0 + x2 * (13860.0 + 45.0 * x2)));
+  return num / den;
+}
+
 // Modified Bessel function I0 (series), for Kaiser windows.
 inline double besselI0(double x) {
   double sum = 1.0, term = 1.0;

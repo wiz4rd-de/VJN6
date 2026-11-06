@@ -49,6 +49,7 @@ struct Voice {
   OnePole dc, hp1, hp2;
   Vcf vcf;
   double cutCur = 0.0, cutDelta = 0.0;  // 60: interpolated log2 cutoff without the envelope
+  double lastLf = -1e300, lastG = 0.0, lastFc = 0.0;  // cutoff coefficient cache (same lf -> same g)
   // portamento (106), in semitones relative to the note
   double porta = 0.0, portaStep = 0.0;
   int portaTicks = 0;

@@ -165,6 +165,8 @@ void Engine::resetVoices() {
     vc.hp1.s = vc.hp2.s = 0.0;
     vc.vcf.reset();
     vc.cutCur = vc.cutDelta = 0.0;
+    vc.lastLf = -1e300;
+    vc.lastG = vc.lastFc = 0.0;
     vc.porta = vc.portaStep = 0.0;
     vc.portaTicks = 0;
     vc.forceEnv = false;
@@ -1008,7 +1010,7 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
   const double S = byte(B_ENV_S);
   const double incMin = k::kPitchMinHz60 / fo_, incMax = k::kCornerClampRatio;
   const double fcMax = k::kCornerClampRatio * fo_;
-  const int iters = os_ == 4 ? 1 : 2;
+  const int iters = 1;
   const double kfb = kfb_, gin = gin_;
   const double dn = dn_;
   EngineHooks& H = hooks;
@@ -1146,10 +1148,16 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
       vc.cutCur += vc.cutDelta;
       lf = vc.cutCur + envOct * vc.env;
     }
-    double fc = dm::exp2(lf);
-    if (fc < k::kVcfMinHz) fc = k::kVcfMinHz;
-    if (fc > fcMax) fc = fcMax;
-    const double g = dm::tan(dm::kPi * fc / fo_);
+    if (lf != vc.lastLf) {
+      double f = dm::exp2(lf);
+      if (f < k::kVcfMinHz) f = k::kVcfMinHz;
+      if (f > fcMax) f = fcMax;
+      vc.lastLf = lf;
+      vc.lastFc = f;
+      vc.lastG = dm::tan(dm::kPi * f / fo_);
+    }
+    const double fc = vc.lastFc;
+    const double g = vc.lastG;
     double y = vc.vcf.process(x, g, kfb, gin, iters, dn);
     if (hv && H.injVcfOut) y = H.injVcfOut[base + i];
     if (capThis && H.capVcfOut) H.capVcfOut[base + i] = y;
