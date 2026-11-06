@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 namespace vjn6::dm {
 
@@ -37,7 +38,13 @@ inline double exp2(double x) {
   p = p * y + 0.5;
   p = p * y + 1.0;
   p = p * y + 1.0;
-  return std::ldexp(p, static_cast<int>(n));
+  const int e = static_cast<int>(n);
+  if (e < -1022 || e > 1023) return std::ldexp(p, e);
+  // exact power of two from the exponent bits (same result as ldexp, without the library call)
+  const uint64_t bits = static_cast<uint64_t>(e + 1023) << 52;
+  double scale;
+  std::memcpy(&scale, &bits, sizeof scale);
+  return p * scale;
 }
 
 inline double exp(double x) { return exp2(x * kLog2e); }
