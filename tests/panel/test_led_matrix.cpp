@@ -13,7 +13,7 @@
 //
 // Steps (separated by ';'): patch N | bank N | bank+ N (Shift+click) | group A|B | manual | write | kt |
 // hold | arp | porta | poly1 | poly2 | poly2+ | lfotrig | range N | pulse | sub | chorusI | chorusII |
-// chorusOff | edit (panel slider: RES) | select N (bank-manager double-click) | set FIELD V (host write) |
+// chorusI+ | chorusII+ (Shift+click) | chorusOff | edit (panel slider: RES) | select N (bank-manager double-click) | set FIELD V (host write) |
 // hostperf NAME V | protect on|off | msg Pr|Er|rc|ok|rE | rx31 | rx30 PP | mode 60|106 | wait MS.
 #include <catch2/catch_test_macros.hpp>
 #include <map>
@@ -74,8 +74,11 @@ const Row kMatrix[] = {
   {"60 a new message replaces the current one", 60, "msg Er; msg Pr", "Pr", false, false, "Pr", "SAW SUB BANK1 PATCH1", ""},
   {"60 RANGE 16' ignored; PULSE, chorus II, HOLD, ARP, LFO TRIG held", 60, "range 0; pulse; chorusII; hold; arp; lfotrig", "11", true, false, "",
    "PULSE SAW SUB CHII HOLD ARP LFOTRIG BANK1 PATCH1", ""},
-  {"60 RANGE 4' ignored; chorus I+II, SUB off", 60, "range 2; chorusI; chorusII; sub", "11", true, false, "", "SAW CHI CHII BANK1 PATCH1", ""},
-  {"60 106-only buttons do nothing", 60, "kt; porta; poly2; chorusOff; group B; bank 8", "11", false, false, "", "SAW SUB BANK1 PATCH1", ""},
+  {"60 RANGE 4' ignored; chorus I+II (II, then Shift+click I), SUB off", 60, "range 2; chorusII; chorusI+; sub", "11", true, false, "", "SAW CHI CHII BANK1 PATCH1", ""},
+  {"60 chorus radio: I then II lights II only", 60, "chorusI; chorusII", "11", true, false, "", "SAW SUB CHII BANK1 PATCH1", ""},
+  {"60 chorus OFF button has no LED", 60, "chorusII; chorusOff", "11", true, false, "", "SAW SUB BANK1 PATCH1", ""},
+  {"60 a plain click from I+II selects that mode", 60, "chorusI; chorusII+; chorusI", "11", true, false, "", "SAW SUB CHI BANK1 PATCH1", ""},
+  {"60 106-only buttons do nothing", 60, "kt; porta; poly2; group B; bank 8", "11", false, false, "", "SAW SUB BANK1 PATCH1", ""},
   {"60 106-only settings set by the host are not shown", 60, "hostperf keytranspose 5; hostperf porta 1; hostperf keymode 2", "11", false, false, "",
    "SAW SUB BANK1 PATCH1", ""},
   {"60 a stored range lights no RANGE LED", 60, "set W0 5", "11", true, false, "", "SAW SUB BANK1 PATCH1", ""},
@@ -196,6 +199,8 @@ void runStep(Rig& r, const std::string& step) {
   else if (op == "chorusI") press(Button::ChorusI);
   else if (op == "chorusII") press(Button::ChorusII);
   else if (op == "chorusOff") press(Button::ChorusOff);
+  else if (op == "chorusI+") press(Button::ChorusI, 0, true);
+  else if (op == "chorusII+") press(Button::ChorusII, 0, true);
   else if (op == "edit") r.apply(Command::setField(B_VCF_RES, r.st().edit.v[B_VCF_RES] + 10, Source::Panel));
   else if (op == "select") r.apply(Command::selectSlot(std::stoi(a), Source::Overlay));
   else if (op == "set") r.apply(Command::setField((a[0] == 'W' ? kNumSliders : 0) + std::stoi(a.substr(1)), std::stoi(b), Source::Host));

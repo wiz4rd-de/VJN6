@@ -118,7 +118,7 @@ const ORDER: Record<'60' | '106', string[]> = {
     'vcf-freq', 'vcf-res', 'vcf-pol', 'vcf-env', 'vcf-lfo', 'vcf-kybd', // the 60 VCF order (C-5)
     'vca-mode', 'vca-level',
     'env-a', 'env-d', 'env-s', 'env-r',
-    'chorus-i', 'chorus-ii',
+    'chorus-off', 'chorus-i', 'chorus-ii',
     ...range('bank-', 5), ...range('patch-', 8), 'manual', 'write', 'hold', 'arp-on', 'arp-mode', 'arp-range', 'arp-rate',
     'tune',
   ],

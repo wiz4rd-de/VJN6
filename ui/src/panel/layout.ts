@@ -104,6 +104,8 @@ export interface ButtonDef extends Common {
   b: ButtonName;
   i?: number;
   led: number;
+  /** The modes in which the button has an LED (§5.2; default both). */
+  ledModes?: ModeSet;
   cap60?: CapColor;
   cap106?: CapColor;
   label: string;
@@ -390,13 +392,17 @@ export const CONTROLS: readonly ControlDef[] = [
   slider('env-r', 'ENV R', Field.ENV_R, 'R', 1204),
 
   // ---- Chorus ----
+  // OFF, I, II are radio buttons in both modes; the 60 OFF has no LED, and in 60 mode I+II is the
+  // combination press CHORUS I <-> CHORUS II (§5.2, R-U4, C-6)
   {
     kind: 'button',
     id: 'chorus-off',
-    modes: '106',
+    modes: 'both',
     aria: 'CHORUS OFF',
     b: 'chorusOff',
     led: Led.CHORUS_OFF,
+    ledModes: '106',
+    cap60: 'white',
     cap106: 'white',
     label: 'OFF',
     x: 1269,
@@ -414,6 +420,8 @@ export const CONTROLS: readonly ControlDef[] = [
     label: 'I',
     x: 1269,
     y: 200,
+    combo: 'Shift+click with CHORUS II lit: I+II',
+    comboModes: '60',
   },
   {
     kind: 'button',
@@ -427,6 +435,8 @@ export const CONTROLS: readonly ControlDef[] = [
     label: 'II',
     x: 1269,
     y: 256,
+    combo: 'Shift+click with CHORUS I lit: I+II',
+    comboModes: '60',
   },
 
   // ---- Memory row ----

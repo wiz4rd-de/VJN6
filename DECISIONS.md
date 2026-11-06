@@ -330,3 +330,19 @@ Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, 
 - **Implementation:** the polarity switch and the ENV/LFO/KYBD sliders have one definition per mode with the
   same ids (like the 60 HPF switch and the 106 HPF slider), so `CONTROLS` stays the Tab order of each mode
   (R-U3: 60 FREQ, RES, polarity, ENV, LFO, KYBD; 106 unchanged). Screenshots: `panel-60-*` only.
+
+### C-6 60 chorus OFF / I / II and the I+II combination press
+- **Core** (`Core` press handling): OFF, I and II write W4 = 0 / 1 / 2 in both modes (106 behaviour is
+  unchanged). In 60 mode a Shift press on I while II is lit (W4 = 2 or 3), or on II while I is lit (W4 = 1
+  or 3), writes 3; if W4 is already 3 nothing changes (no EDITED). Shift without a lit partner, and Shift
+  in 106 mode, act as a plain click (R-U4). The 60 OFF button lights no LED.
+- **Tests:** AC-P1.1's 60 chorus sequence now checks radio clicks and the combination; ChorusOff left its
+  "106-only buttons do nothing" list. A new core AC-U4.1 test covers the 60 combination (and that 106 has
+  none). The LED matrix gained `chorusI+` / `chorusII+` steps; the 60 I+II row now reaches I+II by II then
+  Shift+click I, and three 60 rows were added (radio I → II, OFF without LED, plain click from I+II).
+- **UI:** `chorus-off` is drawn in both modes at (1269, 144); in 60 mode without an LED (new
+  `ButtonDef.ledModes`, here `'106'`) and without `aria-pressed`, because it has no indicator (I and II show
+  the selection); its 60 cap is white like I and II. The 60 tooltips read "CHORUS I — Shift+click with
+  CHORUS II lit: I+II" and "CHORUS II — Shift+click with CHORUS I lit: I+II" (60 only, like the BANK
+  combinations). Button LEDs carry `data-testid="lamp-<id>"`. Screenshots: `panel-60-*`, `settings-60`,
+  `bank-manager-60` (the chorus box shows behind the overlays); every 106 PNG is byte-identical.

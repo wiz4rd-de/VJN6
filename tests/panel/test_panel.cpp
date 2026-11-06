@@ -45,7 +45,7 @@ TEST_CASE("AC-P1.1 every patch field and performance control set from the panel 
   }
 }
 
-TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; chorus I/II toggles", "[panel]") {
+TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; chorus OFF/I/II and I+II", "[panel]") {
   Rig r(48000.0, Mode::J60);
   r.toBoundary();
   auto press = [&](Button b, int i = 0, bool shift = false) { r.apply(Command::press(b, i, shift)); };
@@ -67,19 +67,21 @@ TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; cho
   CHECK(e.v[W_SUB] == 0);
   press(Button::Sub);
   CHECK(e.v[W_SUB] == 1);
-  // chorus I and II each toggle their own state: off -> I -> I+II -> II -> off
+  // chorus OFF, I, II are radio buttons; I+II is the CHORUS I <-> II combination press (v3.2 C-6)
   REQUIRE(e.v[W_CHORUS] == 0);
   press(Button::ChorusI);
   CHECK(e.v[W_CHORUS] == 1);
   press(Button::ChorusII);
+  CHECK(e.v[W_CHORUS] == 2);
+  press(Button::ChorusI, 0, true);  // Shift+click I with II lit
   CHECK(e.v[W_CHORUS] == 3);
-  press(Button::ChorusI);
+  press(Button::ChorusII);  // a plain click from I+II selects that single mode
   CHECK(e.v[W_CHORUS] == 2);
-  press(Button::ChorusII);
+  press(Button::ChorusOff);
   CHECK(e.v[W_CHORUS] == 0);
-  press(Button::ChorusII);
+  press(Button::ChorusII, 0, true);  // Shift+click without a lit partner = plain click
   CHECK(e.v[W_CHORUS] == 2);
-  press(Button::ChorusII);
+  press(Button::ChorusOff);
   CHECK(e.v[W_CHORUS] == 0);
   press(Button::Hold);
   CHECK(r.st().perf.v[P_HOLD] == 1);
@@ -94,7 +96,6 @@ TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; cho
   // 106-only buttons do nothing in 60 mode
   const Patch before = r.st().edit;
   const PerfSettings pb = r.st().perf;
-  press(Button::ChorusOff);
   press(Button::Portamento);
   press(Button::Poly2);
   press(Button::Poly1, 0, true);
@@ -328,4 +329,37 @@ TEST_CASE("AC-P7.1 an empty slot of the default bank equals the R-P7 INIT patch"
     CHECK(s.patch == initPatch());
   }
   for (int f = 0; f < kNumFields; ++f) CHECK(defaultBank()[127].patch.v[f] == expect[f]);
+}
+
+TEST_CASE("AC-U4.1 (core part) 60 mode: CHORUS I <-> CHORUS II combination press gives I+II", "[panel][U4]") {
+  Rig r(48000.0, Mode::J60);
+  r.toBoundary();
+  auto press = [&](Button b, bool shift = false) { r.apply(Command::press(b, 0, shift)); };
+  auto leds = [&]() { return r.core().buttonLeds(); };
+  const Patch& e = r.st().edit;
+  r.st().edit.v[W_CHORUS] = 2;  // II lit
+  press(Button::ChorusI, true);
+  CHECK(e.v[W_CHORUS] == 3);
+  CHECK((leds() >> L_CHORUS_I) & 1u);
+  CHECK((leds() >> L_CHORUS_II) & 1u);
+  CHECK_FALSE((leds() >> L_CHORUS_OFF) & 1u);  // the 60 OFF button has no LED
+  CHECK(r.st().edited);
+  r.st().edited = false;
+  press(Button::ChorusI, true);  // repeating the active combination does nothing
+  press(Button::ChorusII, true);
+  CHECK(e.v[W_CHORUS] == 3);
+  CHECK_FALSE(r.st().edited);
+  press(Button::ChorusI);  // a plain click selects I
+  CHECK(e.v[W_CHORUS] == 1);
+  press(Button::ChorusII, true);  // Shift+click II while I is lit
+  CHECK(e.v[W_CHORUS] == 3);
+  press(Button::ChorusOff);
+  CHECK(e.v[W_CHORUS] == 0);
+  CHECK_FALSE((leds() >> L_CHORUS_OFF) & 1u);
+  // 106 mode has no chorus combination: Shift+click acts as a plain click (R-U4)
+  Rig q(48000.0, Mode::J106);
+  q.toBoundary();
+  q.st().edit.v[W_CHORUS] = 2;
+  q.apply(Command::press(Button::ChorusI, 0, true));
+  CHECK(q.st().edit.v[W_CHORUS] == 1);
 }

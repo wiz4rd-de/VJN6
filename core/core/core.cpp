@@ -259,17 +259,23 @@ void Core::handleCommand(const Command& c) {
         case Button::Sub:
           if (!is106) setField(W_SUB, eff(W_SUB) ? 0 : 1, o, panel);
           return;
-        case Button::ChorusOff:
-          if (is106) setField(W_CHORUS, 0, o, panel);
+        case Button::ChorusOff:  // OFF, I, II are radio buttons in both modes (§5.2)
+          setField(W_CHORUS, 0, o, panel);
           return;
         case Button::ChorusI:
-          if (is106) setField(W_CHORUS, 1, o, panel);
-          else setField(W_CHORUS, eff(W_CHORUS) ^ 1, o, panel);
+        case Button::ChorusII: {
+          if (!is106 && shift) {
+            // 60 mode: CHORUS I <-> CHORUS II is a combination press giving I+II (R-U4, v3.2 C-6)
+            const int ch = eff(W_CHORUS);
+            const bool partnerLit = bt == Button::ChorusI ? (ch == 2 || ch == 3) : (ch == 1 || ch == 3);
+            if (partnerLit) {
+              if (ch != 3) setField(W_CHORUS, 3, o, panel);  // repeating an active combination does nothing
+              return;
+            }
+          }
+          setField(W_CHORUS, bt == Button::ChorusI ? 1 : 2, o, panel);
           return;
-        case Button::ChorusII:
-          if (is106) setField(W_CHORUS, 2, o, panel);
-          else setField(W_CHORUS, eff(W_CHORUS) ^ 2, o, panel);
-          return;
+        }
         case Button::Portamento:
           if (is106) setPerf(P_PORTA_ON, st_.perf.v[P_PORTA_ON] ? 0 : 1, o);
           return;

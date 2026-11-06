@@ -1,6 +1,6 @@
-// Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, the 60 VCF order, 60 chorus
-// toggles), AC-U4.1 (combination press), AC-P5.1 (UI part: the centre-zero 60 VCA LEVEL) and AC-S3.3
-// (a mocked MIDI CC is visible within 100 ms).
+// Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, the 60 VCF order, the 60
+// chorus radio buttons), AC-U4.1 (combination presses), AC-P5.1 (UI part: the centre-zero 60 VCA
+// LEVEL) and AC-S3.3 (a mocked MIDI CC is visible within 100 ms).
 import type { Page } from '@playwright/test';
 import { ctl, expect, F, midi, openAndStart, P, setMode, state, test, waitForState, type CoreState } from './fixtures';
 
@@ -38,6 +38,7 @@ const BOTH: Record<string, Target> = {
   hpf: { field: F.HPF },
   'vcf-pol': { field: F.VCF_POL },
   'vca-mode': { field: F.VCA_MODE },
+  'chorus-off': { field: F.CHORUS },
   'chorus-i': { field: F.CHORUS },
   'chorus-ii': { field: F.CHORUS },
   ...Object.fromEntries([1, 2, 3, 4, 5].map((i) => [`bank-${i}`, { button: true }])),
@@ -66,7 +67,6 @@ const ONLY_106: Record<string, Target> = {
   'range-16': { field: F.RANGE },
   'range-8': { field: F.RANGE },
   'range-4': { field: F.RANGE },
-  'chorus-off': { field: F.CHORUS },
   'group-a': { button: true },
   'group-b': { button: true },
   'bank-6': { button: true },
@@ -316,26 +316,105 @@ test.describe('AC-P1.1 control map (UI part)', () => {
     await expect(ctl(page, 'vcf-pol')).toHaveAttribute('aria-valuetext', '−');
   });
 
-  test('AC-P1.1 60 mode: the chorus I and II buttons toggle off / I / II / I+II', async ({ page }) => {
+  test('AC-P1.1 60 mode: chorus OFF, I, II are radio buttons (OFF without LED); the CHORUS I ↔ II combination press gives I+II (C-6)', async ({
+    page,
+  }) => {
     await openAndStart(page);
-    const i = ctl(page, 'chorus-i');
-    const ii = ctl(page, 'chorus-ii');
-    expect((await state(page)).edit[F.CHORUS]).toBe(0); // INIT, slot 1
-    const steps: [typeof i, number, boolean, boolean][] = [
-      [i, 1, true, false], // off → I
-      [ii, 3, true, true], // I → I+II
-      [i, 2, false, true], // I+II → II
-      [ii, 0, false, false], // II → off
-      [ii, 2, false, true], // off → II
-      [i, 3, true, true], // II → I+II
+    const btn = { off: ctl(page, 'chorus-off'), i: ctl(page, 'chorus-i'), ii: ctl(page, 'chorus-ii') };
+    await expect(page.getByTestId('lamp-chorus-off'), 'the 60 OFF button has no LED').toHaveCount(0);
+    await expect(btn.off, 'a plain push button: no pressed state').not.toHaveAttribute('aria-pressed', /.*/);
+    // [button, Shift held, W4 after, I lit, II lit]
+    const steps: [keyof typeof btn, boolean, number, boolean, boolean][] = [
+      ['off', false, 0, false, false], // → off (from any start)
+      ['i', false, 1, true, false], // off → I
+      ['ii', false, 2, false, true], // I → II (radio)
+      ['i', false, 1, true, false], // II → I
+      ['off', false, 0, false, false], // I → off
+      ['i', true, 1, true, false], // Shift without a lit partner = plain click
+      ['ii', true, 3, true, true], // Shift+II with I lit → I+II
+      ['ii', false, 2, false, true], // a plain click in I+II selects that single mode
+      ['i', true, 3, true, true], // Shift+I with II lit → I+II
+      ['i', false, 1, true, false],
+      ['ii', true, 3, true, true],
+      ['off', false, 0, false, false], // I+II → off
     ];
-    for (const [btn, w4, litI, litII] of steps) {
-      await btn.click();
-      await waitForState(page, (s) => s.edit[F.CHORUS] === w4, `W4 = ${w4}`);
-      await expect(i).toHaveAttribute('data-lit', String(litI));
-      await expect(ii).toHaveAttribute('data-lit', String(litII));
+    for (const [id, shift, w4, litI, litII] of steps) {
+      await btn[id].click({ modifiers: shift ? ['Shift'] : [] });
+      await waitForState(page, (s) => s.edit[F.CHORUS] === w4, `${shift ? 'Shift+' : ''}${id} → W4 = ${w4}`);
+      await expect(btn.i).toHaveAttribute('data-lit', String(litI));
+      await expect(btn.ii).toHaveAttribute('data-lit', String(litII));
+      await expect(btn.off).toHaveAttribute('data-lit', 'false');
+      expect((await state(page)).lit, 'L_CHORUS_OFF (bit 6) is never lit in 60 mode').not.toContain(6);
     }
+    // a click on the selected radio button changes nothing
+    const seq = (await state(page)).seq;
+    await btn.off.click();
+    await page.waitForTimeout(250);
+    expect((await state(page)).seq).toBe(seq);
+    // the I and II tooltips name the Shift+click in 60 mode only (R-U4)
+    const tip = page.getByTestId('tooltip');
+    for (const [id, text] of [
+      ['off', 'CHORUS OFF'],
+      ['i', 'CHORUS I — Shift+click with CHORUS II lit: I+II'],
+      ['ii', 'CHORUS II — Shift+click with CHORUS I lit: I+II'],
+    ] as const) {
+      await btn[id].hover();
+      await expect(tip).toHaveText(text);
+    }
+
+    await setMode(page, '106');
+    await expect(page.getByTestId('lamp-chorus-off')).toHaveCount(1);
+    await expect(btn.off).toHaveAttribute('aria-pressed', 'true');
+    for (const [id, text] of [
+      ['i', 'CHORUS I'],
+      ['ii', 'CHORUS II'],
+    ] as const) {
+      await btn[id].hover();
+      await expect(tip).toHaveText(text);
+    }
+    // no combination in 106 mode: Shift+click I with II lit is a plain click
+    await btn.ii.click();
+    await waitForState(page, (s) => s.edit[F.CHORUS] === 2, '106 II → W4 = 2');
+    await btn.i.click({ modifiers: ['Shift'] });
+    await waitForState(page, (s) => s.edit[F.CHORUS] === 1, '106 Shift+I → W4 = 1');
+    await expect(btn.i).toHaveAttribute('data-lit', 'true');
+    await expect(btn.ii).toHaveAttribute('data-lit', 'false');
   });
+});
+
+test('AC-U4.1 60 mode, CHORUS II lit: Shift+click I → I+II; Shift+click I → unchanged; click I → I (C-6)', async ({
+  page,
+}) => {
+  await openAndStart(page);
+  const i = ctl(page, 'chorus-i');
+  const ii = ctl(page, 'chorus-ii');
+  await ii.click();
+  await waitForState(page, (s) => s.edit[F.CHORUS] === 2, 'II');
+  await expect(i).toHaveAttribute('data-lit', 'false');
+  await expect(ii).toHaveAttribute('data-lit', 'true');
+
+  await i.click({ modifiers: ['Shift'] });
+  await waitForState(page, (s) => s.edit[F.CHORUS] === 3, 'I+II');
+  await expect(i).toHaveAttribute('data-lit', 'true');
+  await expect(ii).toHaveAttribute('data-lit', 'true');
+
+  const seq = (await state(page)).seq;
+  await i.click({ modifiers: ['Shift'] });
+  await page.waitForTimeout(250);
+  const s = await state(page);
+  expect(s.edit[F.CHORUS], 'repeating the active combination does nothing').toBe(3);
+  expect(s.seq).toBe(seq);
+  await expect(i).toHaveAttribute('data-lit', 'true');
+  await expect(ii).toHaveAttribute('data-lit', 'true');
+
+  await i.click();
+  await waitForState(page, (st) => st.edit[F.CHORUS] === 1, 'I');
+  await expect(i).toHaveAttribute('data-lit', 'true');
+  await expect(ii).toHaveAttribute('data-lit', 'false');
+  // Shift+Enter on the focused button is the same combination press (R-U4)
+  await ii.focus();
+  await page.keyboard.press('Shift+Enter');
+  await waitForState(page, (st) => st.edit[F.CHORUS] === 3, 'Shift+Enter on II with I lit → I+II');
 });
 
 test('AC-U4.1 106 mode, POLY 1 lit: Shift+click POLY 2 → UNISON; Shift+click POLY 1 → unchanged; click POLY 1 → POLY 1', async ({

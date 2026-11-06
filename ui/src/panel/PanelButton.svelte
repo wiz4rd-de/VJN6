@@ -1,7 +1,8 @@
 <script lang="ts">
-  // A 26 × 26 panel button with its LED (§5.2). Click = press; Shift+click (Shift+Enter) = the
-  // combination press (R-U4). LFO TRIG is momentary: held from pointer-down until pointer-up
-  // anywhere, window blur or editor close; with keyboard focus, held while Enter is held.
+  // A 26 × 26 panel button with its LED (§5.2; the 60 chorus OFF has none). Click = press;
+  // Shift+click (Shift+Enter) = the combination press (R-U4). LFO TRIG is momentary: held from
+  // pointer-down until pointer-up anywhere, window blur or editor close; with keyboard focus, held
+  // while Enter is held.
   import { app } from '../model.svelte';
   import { Led } from '../protocol';
   import { keyTransposeV } from './format';
@@ -11,6 +12,8 @@
   let { def, is106 }: { def: ButtonDef; is106: boolean } = $props();
 
   const lit = $derived(app.ledOn(def.led));
+  // a button without an LED in this mode (the 60 chorus OFF) is a plain push button
+  const hasLed = $derived(inMode(def.ledModes ?? 'both', is106));
   const cap = $derived((is106 ? def.cap106 : def.cap60) ?? 'white');
   const blinking = $derived(!!app.core?.blinking?.includes(def.led));
   const tooltip = () => {
@@ -86,18 +89,21 @@
   }
 </script>
 
-<span
-  class="led"
-  class:on={lit}
-  aria-hidden="true"
-  style="left:{def.x + BUTTON / 2 - 3.5}px; top:{def.y - 10}px"
-></span>
+{#if hasLed}
+  <span
+    class="led"
+    class:on={lit}
+    aria-hidden="true"
+    data-testid="lamp-{def.id}"
+    style="left:{def.x + BUTTON / 2 - 3.5}px; top:{def.y - 10}px"
+  ></span>
+{/if}
 <button
   bind:this={el}
   type="button"
   class="cap"
   aria-label={def.aria}
-  aria-pressed={lit}
+  aria-pressed={hasLed ? lit : undefined}
   data-testid="ctl-{def.id}"
   data-lit={lit}
   data-blinking={blinking}
