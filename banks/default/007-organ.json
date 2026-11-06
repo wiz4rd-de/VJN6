@@ -1,0 +1,34 @@
+{
+  "slot": 7,
+  "name": "ORGAN",
+  "description": "Pulse and sub through the GATE VCA, delayed vibrato.",
+  "sliders": {
+    "lfo_rate": 70,
+    "lfo_delay": 30,
+    "dco_lfo": 4,
+    "dco_pwm": 32,
+    "noise": 0,
+    "vcf_freq": 85,
+    "vcf_res": 0,
+    "vcf_env": 0,
+    "vcf_lfo": 0,
+    "vcf_kybd": 64,
+    "vca_level": 105,
+    "env_a": 0,
+    "env_d": 0,
+    "env_s": 127,
+    "env_r": 10,
+    "sub_level": 70
+  },
+  "switches": {
+    "range": 1,
+    "pulse": 1,
+    "saw": 0,
+    "sub": 1,
+    "chorus": 1,
+    "pwm_src": 1,
+    "vcf_pol": 0,
+    "vca_mode": 1,
+    "hpf": 1
+  }
+}

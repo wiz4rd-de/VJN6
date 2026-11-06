@@ -1,0 +1,12 @@
+/build*/
+/compile_commands.json
+.DS_Store
+node_modules/
+/ui/dist/
+/ui/public/vjn6.js
+/ui/public/vjn6.wasm
+/ui/test-results/
+/ui/playwright-report/
+*.pyc
+__pycache__/
+/.cache/

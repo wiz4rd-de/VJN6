@@ -1,0 +1,34 @@
+{
+  "slot": 8,
+  "name": "SWEEP",
+  "description": "Resonant saw with a slow LFO filter sweep.",
+  "sliders": {
+    "lfo_rate": 25,
+    "lfo_delay": 0,
+    "dco_lfo": 0,
+    "dco_pwm": 0,
+    "noise": 0,
+    "vcf_freq": 40,
+    "vcf_res": 95,
+    "vcf_env": 20,
+    "vcf_lfo": 70,
+    "vcf_kybd": 64,
+    "vca_level": 110,
+    "env_a": 30,
+    "env_d": 80,
+    "env_s": 90,
+    "env_r": 70,
+    "sub_level": 40
+  },
+  "switches": {
+    "range": 1,
+    "pulse": 0,
+    "saw": 1,
+    "sub": 1,
+    "chorus": 2,
+    "pwm_src": 0,
+    "vcf_pol": 0,
+    "vca_mode": 0,
+    "hpf": 1
+  }
+}
