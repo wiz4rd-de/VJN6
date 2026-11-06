@@ -188,3 +188,40 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   assertions; golden hashes bit-identical).
 - **Benchmark stimulus** (§9.1): UNISON BRASS with Chorus I and one legato note change per second so all six
   voices sound for the full 10 s.
+
+## Plugin and standalone
+
+- **Host writes (R-S3)**: every `setValue` outside the plugin's own reports (marked with a thread-local
+  flag) is a host write; writes are coalesced per block and applied at offset 0 before `render()`.
+- **Reporting to the host**: core changes are reported once per changed parameter, except changes whose
+  origin is host automation (`Origin::Host`), which the host already knows — unless the plugin's own report
+  has since overwritten the host's last write. Host program selections carry `Origin::HostProgram` and are
+  always reported, so the host's values match the core.
+- **Gestures**: the end of a panel drag is delayed by 50 ms so the final value reaches the host inside the
+  gesture; open gestures are ended, and `releaseAll` posted, when the page unloads or the editor closes.
+- **Synchronous apply**: when no audio callback runs, `setStateInformation` and `setCurrentProgram` render
+  5 ms of silence so that the change takes effect at once.
+- **Fallback driver (desktop)**: a 5 ms tick thread takes over 100 ms after the last `processBlock`, renders
+  at most 100 ms per tick and drops host MIDI out; `processBlock` waits at most 2 ms for the render guard,
+  then outputs silence for that block; `prepareToPlay` takes the guard.
+- **Window size**: the plugin editor's last size is kept per instance in memory (the state blob is the
+  core's §4.7 blob); the standalone stores it in JUCE's properties file. Choosing Fit does not resize an
+  open window, percentages do; Fit leaves 40 × 80 px for the window frame.
+- **Standalone MIDI**: all inputs are enabled on first run and new inputs are enabled; inputs are merged by
+  JUCE (one source); an unplugged input posts `MidiPortGone` for port 0; without an audio device input MIDI
+  goes straight to the core; the single MIDI output is driven from the message thread (JUCE's own default
+  MIDI output stays empty); the choice is saved as `midiOutputId` / `midiOutputName` in the properties file.
+- **State files (F-13, R-D2)**: writes go to a per-process temp file renamed over the target; a zero-length
+  `state.bin` is a first run (no `rE`, no rename); the final save on quit happens after 10 ms of silent
+  render; after a failed save the next change retries, and a successful save clears the status line.
+  `VJN6_STATE_DIR` overrides the directory (tests).
+- **Messages to the UI**: `env` after the first full state and again when outputs, the chosen output or
+  the save error change; `inputs` is `[]` on the desktop; an export write failure sends notice
+  `writeFailed` with the full path.
+- **Parameter types**: porta on, hold and arpeggio on are `AudioParameterBool` (OFF/ON); switches and other
+  choices (including arpeggio range) are `AudioParameterChoice`; typed slider text maps back via
+  round(v × 12.7). Host renames of programs are ignored. Settings, slot/bank and non-parameter performance
+  changes call `updateHostDisplay(nonParameterStateChanged)`.
+- **UI bundle in the binary**: every file of `ui/dist` is embedded with `juce_add_binary_data`, staged as
+  `ui<N>.<ext>` with a generated path table (MSBuild-safe names); without `ui/dist/index.html` the plugin is
+  skipped with a configure warning (`npm run build` first).
