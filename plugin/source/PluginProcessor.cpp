@@ -20,7 +20,6 @@ namespace {
 double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
 constexpr double kDeviceTimeoutMs = 100.0;      // fallback driver takes over after this
-constexpr double kHostSelectWindowMs = 1000.0;  // host program selection reports (DECISIONS)
 constexpr double kGestureEndDelayMs = 50.0;     // let the drag's last value reach the host first
 constexpr int kDefaultBlock = 512;
 constexpr std::size_t kMaxFileRead = (1u << 20) + 1;  // over 1 MiB is rejected by files::parse
@@ -291,7 +290,6 @@ void VJN6AudioProcessor::syncParametersFromState(const vjn6::Patch& edit, const 
 
 void VJN6AudioProcessor::setCurrentProgram(int index) {
   if (index < 0 || index >= vjn6::kNumSlots) return;
-  hostSelectUntilMs_.store(nowMs() + kHostSelectWindowMs);
   currentProgram_.store(index);
   // F-4 via host program: never transmits; the core ignores selecting the current slot.
   postCommand(vjn6::Command::selectSlot(index + 1, vjn6::Source::Host));
@@ -450,11 +448,10 @@ void VJN6AudioProcessor::onParameterEvent(int index, int value, vjn6::Origin ori
   const auto k = static_cast<size_t>(index);
   bool report = true;
   if (origin == vjn6::Origin::Host) {
-    // Host automation is already known to the host. A host program selection changes fields
-    // with origin Host too: those, and host writes that the plugin has since overwritten with a
-    // report of its own, are reported so that the host's values always match the core.
-    report = lastWriterIsPlugin_[k].load(std::memory_order_relaxed) ||
-             (index < vjn6::kNumFields && nowMs() < hostSelectUntilMs_.load());
+    // Host automation is already known to the host; report it only when the plugin has since
+    // overwritten the host's last write with a report of its own. Changes caused by a host
+    // program selection (Origin::HostProgram) are always reported, so the host's values match.
+    report = lastWriterIsPlugin_[k].load(std::memory_order_relaxed);
   }
   if (report && access_[k]->nativeValue() != value) reportToHost(index, value);
 }

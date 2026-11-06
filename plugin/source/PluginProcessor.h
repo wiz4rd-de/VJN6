@@ -153,7 +153,6 @@ class VJN6AudioProcessor final : public juce::AudioProcessor, private HostWriteL
   std::array<std::atomic<bool>, kNumHostParams> lastWriterIsPlugin_{};
   std::array<bool, kNumHostParams> gestureActive_{};
   std::array<double, kNumHostParams> gestureEndDue_{};
-  std::atomic<double> hostSelectUntilMs_{0.0};
   bool programChanged_ = false, namesDirty_ = false, stateChanged_ = false, programAnnounced_ = false;
 
   // rendering

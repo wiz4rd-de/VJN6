@@ -154,7 +154,7 @@ void checkSlotSelection(const std::function<void(VJN6AudioProcessor&)>& select, 
   p->eventObserver = [&](const vjn6::Event& e) {
     if (e.type != vjn6::EventType::FieldChanged && e.type != vjn6::EventType::PerfChanged) return;
     ++fieldEvents;
-    if (static_cast<vjn6::Origin>(e.b) == vjn6::Origin::Host) ++hostEvents;
+    if (static_cast<vjn6::Origin>(e.b) == vjn6::Origin::HostProgram) ++hostEvents;
   };
   host.run(2);
   listener.reset();

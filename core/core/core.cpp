@@ -420,7 +420,7 @@ void Core::handleCommand(const Command& c) {
     case CommandType::SelectSlot:
       if (c.i >= 1 && c.i <= kNumSlots) {
         if (c.src == Source::Host && c.i == st_.currentSlot) return;  // host restore keeps an EDITED buffer
-        selectSlot(c.i, o, c.src == Source::Overlay || c.src == Source::Panel);
+        selectSlot(c.i, c.src == Source::Host ? Origin::HostProgram : o, c.src == Source::Overlay || c.src == Source::Panel);
       }
       return;
     case CommandType::Rename: {

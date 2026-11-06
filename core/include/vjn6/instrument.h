@@ -118,7 +118,7 @@ enum class EventType : uint8_t {
 };
 
 // Origin of a change reported in FieldChanged/PerfChanged (R-S1, R-S3).
-enum class Origin : uint8_t { Panel = 0, Overlay, Keyboard, Host, Midi, Sysex, Load, System };
+enum class Origin : uint8_t { Panel = 0, Overlay, Keyboard, Host, Midi, Sysex, Load, System, HostProgram };
 
 enum class NoticeKind : uint8_t {
   Loaded = 0,        // a patch file was loaded into the edit buffer
