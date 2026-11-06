@@ -57,6 +57,14 @@ class Chorus {
   // Advances only the free-running chorus LFO (used while off).
   inline void advanceLfo() { lfoPhase_ += lfoInc_; if (lfoPhase_ >= 1.0) lfoPhase_ -= 1.0; }
   int mode() const { return mode_; }
+  template <typename F>
+  void visitState(F&& f) {
+    for (Line& L : lines_) {
+      for (int s = 0; s < 3; ++s) { f(L.xin[s].re); f(L.xin[s].im); f(L.xout[s].re); f(L.xout[s].im); }
+      for (double& v : L.fifo) f(v);
+      f(L.level); f(L.hp.s); f(L.shelfLp.s);
+    }
+  }
 
   // ---- test access (SPEC §9.4) ----
   struct Line;

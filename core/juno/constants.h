@@ -31,6 +31,10 @@ constexpr int kDivisorMax = 65535;         // (SN)
 constexpr double kDutyCentre = 0.50;       // (SN) 50 % at CV 0
 constexpr double kDutySpan = 0.45;         // (SN) 95 % at max CV
 constexpr double kPitchMinHz60 = 8.0;      // spec: 60-mode pitch clamp, lower end
+// Band-limiting kernel (latitude, §14): Kaiser-windowed sinc in host samples.
+constexpr double kBlepHalfHost = 8.0;     // half-length in host samples
+constexpr double kBlepCutoffHost = 0.47;  // -6 dB point relative to the host rate
+constexpr double kBlepBeta = 6.0;
 constexpr double kDcBlockHz = 0.35;        // (CA 106: 10 uF into 44.9 kOhm; D: used for both modes)
 constexpr double kRangeCents16 = -1200.0;  // spec
 constexpr double kRangeCents4 = 1200.0;    // spec
@@ -56,8 +60,8 @@ constexpr double kKmax60 = 4.35;           // (D) resonance law maximum, 60 mode
 constexpr double kResExponent = 1.5;       // (D) k = k_max * r^1.5
 constexpr double kQComp = 0.23;            // (D) g_in = 1 + 0.23 k, fitted to KR-106 data
 // c_cal: derived, measured on this solver (DECISIONS.md "c_cal"). Index [oversample == 4].
-constexpr double kCcal106[2] = {1.126, 1.126};  // (derived) 106 mode, 2x / 4x
-constexpr double kCcal60[2] = {1.092, 1.092};   // (derived) 60 mode, 2x / 4x
+constexpr double kCcal106[2] = {1.1259, 1.1259};  // (derived, measured) 106 mode, 2x / 4x
+constexpr double kCcal60[2] = {1.0917, 1.0917};   // (derived, measured) 60 mode, 2x / 4x
 constexpr double kCutoffBase60Hz = 28.1;   // (SN/CA) 60 cutoff at FREQ 0, note 60
 constexpr double kCutoffSpan60Oct = 10.5;  // (SN/CA) 60 FREQ slider span
 constexpr double kEnvDepth60Oct = 10.0;    // (SN)

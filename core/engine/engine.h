@@ -42,7 +42,7 @@ struct Voice {
   int divisor = 0;
   double sub = 1.0;
   bool pulseHigh = true;
-  double ring[16] = {};
+  double ring[BlepTable::kRing] = {};
   uint32_t ringPos = 0;
   double baseInc60 = 0.0;  // 60: increment without the shared clock multiplier
   // filters
@@ -74,6 +74,8 @@ struct EngineHooks {
   double* capPhase = nullptr;         // oversampled: phase
   double* capCut = nullptr;           // oversampled: effective cutoff c_cal*fc in Hz
   double* capVca = nullptr;           // oversampled: VCA gain
+  double* capVoiceOut = nullptr;      // oversampled: voice output after the VCA
+  double* capNoiseHost = nullptr;     // host rate: the shared noise source before upsampling
   const double* injChorusIn = nullptr;  // host rate
   double* capChorusIn = nullptr;
   double* capDry = nullptr;           // host rate, decimated voice sum
@@ -132,9 +134,26 @@ class Engine {
   double osRate() const { return fo_; }
   double hostRate() const { return fs_; }
   int oversample() const { return os_; }
+  int blepDelay() const { return blep_->delay(); }
   uint64_t tickIndex() const { return tick_; }
-  // Skip voice rendering (test-only speed-up for long control-path measurements).
+  // Test-only: run only the control path (no audio processing at all) for long measurements.
   bool testSkipVoices = false;
+  // Test-only: force the LFO triangle value and the delay gain after each control step.
+  bool testForceLfo = false;
+  double testLfoValue = 0.0, testDelayGain = 1.0;
+  // Test-only: visits every recursive state variable (for the subnormal check, AC-E13.1).
+  template <typename F>
+  void visitState(F&& f) {
+    for (Voice& vc : v_) {
+      f(vc.env); f(vc.gate); f(vc.envRc); f(vc.lfcRc); f(vc.pwmRc); f(vc.dc.s); f(vc.hp1.s); f(vc.hp2.s);
+      f(vc.cutCur); f(vc.porta);
+      for (int i = 0; i < 4; ++i) { f(vc.vcf.s[i]); f(vc.vcf.tg[i]); f(vc.vcf.v1[i]); f(vc.vcf.v2[i]); }
+      f(vc.vcf.y4); f(vc.vcf.tfb);
+      for (double& x : vc.ring) f(x);
+    }
+    chorus_.visitState(f);
+    f(multVal_); f(lfoPwmVal_);
+  }
   double denormSign() const { return dn_; }
 
   static uint32_t sourceOf(uint32_t key) { return key >> 8; }
@@ -253,10 +272,20 @@ class Engine {
 
   // noise and resampling
   XorShift32 noiseRng_{k::kSeedDcoNoise};
-  HalfBand decFinal_, decFirst_, intFinal_, intFirst_;
+  LowpassDecimator decFinal_;
+  HalfBand decFirst_, intFinal_, intFirst_;
   std::vector<double> noiseHost_, noise2_, noiseOs_, bus_, bus2_, dry_;
   std::vector<double> mult_, lfoPwm_;
   Chorus chorus_;
+  BlepTable blep2_, blep4_;
+  const BlepTable* blep_ = &blep2_;
+
+ public:
+  // test-only: rebuild the BLEP tables with other kernel parameters
+  void testBlep(double hostHalf, double cutoff, double beta) {
+    blep2_.build(hostHalf, cutoff, beta, 2, 64);
+    blep4_.build(hostHalf, cutoff, beta, 4, 64);
+  }
 };
 
 }  // namespace vjn6

@@ -24,32 +24,36 @@ struct XorShift32 {
 };
 
 // ------------------------------------------------------------------------------------------------
-// Band-limited step (BLEP) residual table. Kernel: Kaiser-windowed sinc, length 8 samples,
-// cutoff 0.45 of the oversampled rate, beta 6 (pass band -0.11 dB at 0.25 fo, >= 65 dB rejection
-// above 0.7 fo; DECISIONS.md "Band-limiting"). A step at fractional time t_d = n - frac changes
-// samples n-4 .. n+3; the caller delays its output by kBlepDelay samples.
-struct BlepTable {
-  static constexpr int kHalf = 4;
-  static constexpr int kPhases = 256;
-  static constexpr int kDelay = kHalf;
-  // r[j + kHalf][p] = residual at tau = j + p / kPhases, j = -4..3, p = 0..kPhases
-  double r[2 * kHalf][kPhases + 1];
-
-  static const BlepTable& get();
-
-  // Adds delta * residual to ring entries for samples n-4..n+3. ring has 16 entries, n is the
-  // index of the first sample after the step, frac in [0,1) is the time since the step in samples.
+// Band-limited step (BLEP) residual table. The kernel is a Kaiser-windowed sinc defined in HOST
+// samples, so the DCO is band-limited to about the host Nyquist frequency whatever the oversampling:
+// the oversampling then stays free as headroom for the VCF's saturating stages, whose products of
+// in-band content cannot fold back below fs/2 (DECISIONS.md "Band-limiting"). A step at fractional
+// time t_d = n - frac changes oversampled samples n-half .. n+half-1; the DCO output is delayed by
+// half samples.
+class BlepTable {
+ public:
+  static constexpr int kRing = 512;  // per-voice ring size (power of two, > 2 * half)
+  static constexpr uint32_t kMask = kRing - 1;
+  void build(double hostHalfLen, double cutoffHost, double beta, int os, int phases);
+  int delay() const { return half_; }
+  // Adds delta * residual to ring entries for samples n-half..n+half-1.
   inline void add(double* ring, uint32_t n, double frac, double delta) const {
-    double fp = frac * kPhases;
+    double fp = frac * phases_;
     int p = static_cast<int>(fp);
-    if (p >= kPhases) p = kPhases - 1;
+    if (p >= phases_) p = phases_ - 1;
     const double t = fp - p;
-    for (int j = -kHalf; j < kHalf; ++j) {
-      const double* row = r[j + kHalf];
-      const double v = row[p] + (row[p + 1] - row[p]) * t;
-      ring[(n + static_cast<uint32_t>(j)) & 15u] += delta * v;
+    const double* row = r_.data() + p;
+    const int stride = phases_ + 1;
+    uint32_t idx = n - static_cast<uint32_t>(half_);
+    for (int j = 0; j < 2 * half_; ++j, row += stride, ++idx) {
+      const double v = row[0] + (row[1] - row[0]) * t;
+      ring[idx & kMask] += delta * v;
     }
   }
+
+ private:
+  int half_ = 0, phases_ = 0;
+  std::vector<double> r_;  // [(j + half) * (phases + 1) + p] = residual at tau = j + p / phases
 };
 
 // ------------------------------------------------------------------------------------------------
@@ -105,6 +109,34 @@ class HalfBand {
   std::vector<int> evenOff_;  // k / 2
   std::vector<double> ibuf_;
   int ilen_ = 0, ipos_ = 0;
+};
+
+// ------------------------------------------------------------------------------------------------
+// Final decimate-by-2 stage: symmetric Kaiser lowpass FIR with its stop band starting at the output
+// Nyquist frequency (a strict half-band filter is only -6 dB there and would fold the DCO's
+// harmonics just above fs/2 back into the band; DECISIONS.md "Decimator").
+class LowpassDecimator {
+ public:
+  void design(int taps, double cutoff, double beta);  // cutoff relative to the input rate
+  int centre() const { return c_; }
+  void resetState();
+  inline double decimate(double x0, double x1) {
+    push(x0);
+    push(x1);
+    const double* b = &buf_[pos_];  // b[0] oldest .. b[n_-1] newest
+    double acc = h_[static_cast<std::size_t>(c_)] * b[c_];
+    for (int k = 0; k < c_; ++k) acc += h_[static_cast<std::size_t>(k)] * (b[k] + b[n_ - 1 - k]);
+    return acc;
+  }
+
+ private:
+  inline void push(double x) {
+    buf_[pos_] = x;
+    buf_[pos_ + n_] = x;
+    pos_ = pos_ + 1 == n_ ? 0 : pos_ + 1;
+  }
+  int n_ = 0, c_ = 0, pos_ = 0;
+  std::vector<double> h_, buf_;
 };
 
 // ------------------------------------------------------------------------------------------------

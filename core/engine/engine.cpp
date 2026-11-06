@@ -18,11 +18,14 @@ inline double pnp(double e) {
 }
 }  // namespace
 
-Engine::Engine() { (void)BlepTable::get(); }
+Engine::Engine() {
+  blep2_.build(k::kBlepHalfHost, k::kBlepCutoffHost, k::kBlepBeta, 2, 64);
+  blep4_.build(k::kBlepHalfHost, k::kBlepCutoffHost, k::kBlepBeta, 4, 64);
+}
 
 int Engine::latencyFor(int os) {
-  // decimator group delay in host samples, rounded half up: 2x 67/2 = 33.5 -> 34; 4x 33.5 + 15/4 -> 37
-  const double d = os == 4 ? 67.0 / 2.0 + 15.0 / 4.0 : 67.0 / 2.0;
+  // decimator group delay in host samples, rounded half up: 2x 136/2 = 68; 4x 68 + 15/4 = 71.75 -> 72
+  const double d = os == 4 ? 136.0 / 2.0 + 15.0 / 4.0 : 136.0 / 2.0;
   return static_cast<int>(std::floor(d + 0.5));
 }
 
@@ -37,7 +40,7 @@ void Engine::allocate(int maxBlock) {
   dry_.assign(n, 0.0);
   mult_.assign(n * 4, 0.0);
   lfoPwm_.assign(n * 4, 0.0);
-  decFinal_.design(135, 10.5);
+  decFinal_.design(273, 0.2375, 10.6);
   decFirst_.design(31, 10.5);
   intFinal_.design(135, 10.5);
   intFirst_.design(31, 10.5);
@@ -88,6 +91,7 @@ void Engine::setOversample(int os) {
   os_ = os == 4 ? 4 : 2;
   fo_ = fs_ * os_;
   latency_ = latencyFor(os_);
+  blep_ = os_ == 4 ? &blep4_ : &blep2_;
   decFinal_.resetState();
   decFirst_.resetState();
   intFinal_.resetState();
@@ -282,6 +286,10 @@ void Engine::computeControl60() {
   delayGain_ = delayGainAt(manual, lfoTrig_, trigStart_, delayActive_, delayStart_, pos_,
                            k::kLfoDelayMax60S * byte(B_LFO_DELAY), fs_);
   if (!manual && delayActive_ && delayGain_ >= 1.0) delayActive_ = false;
+  if (testForceLfo) {
+    lfoOut_ = testLfoValue;
+    delayGain_ = testDelayGain;
+  }
   const double tune = (perf(P_TUNE) - 64) * k::kTuneCentsPerStep;
   const double bend = k::kBendDco60Cents * (perf(P_BEND_DCO) / 127.0) * lever_;
   const double lfoC = k::kLfoDcoCents60 * (delayGain_ * byte(B_DCO_LFO)) * lfoOut_;
@@ -321,6 +329,10 @@ void Engine::tick106() {
   }
   delayGain_ = delayGainAt(false, false, -1, delayActive_, delayStart_, pos_, k::kLfoDelayMax106S * byte(B_LFO_DELAY), fs_);
   if (delayActive_ && delayGain_ >= 1.0) delayActive_ = false;
+  if (testForceLfo) {
+    lfoOut_ = testLfoValue;
+    delayGain_ = testDelayGain;
+  }
   const double lq = std::round(lever_ * 127.0) / 127.0;  // 8-bit lever read (CA)
   double depth = delayGain_ * byte(B_DCO_LFO) + (push_ ? perf(P_LFO_TRIG_SENS) / 127.0 : 0.0);
   if (depth > 1.0) depth = 1.0;
@@ -953,7 +965,7 @@ void Engine::arpChanged(bool on) {
 // rendering
 
 void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
-  const BlepTable& bt = BlepTable::get();
+  const BlepTable& bt = *blep_;
   const bool is106 = mode_ == Mode::J106;
   const double var = settings_->v[S_VARIATION] / 100.0;
   const double sawW = sw(W_SAW) ? (k::kSawPeak * (1.0 + vc.uSaw * k::kVarSawAmp * var)) : 0.0;
@@ -1078,8 +1090,8 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
     vc.phase = p;
     const double saw = is106 ? (2.0 * p - 1.0) : (1.0 - 2.0 * p);
     const double pul = vc.pulseHigh ? 1.0 : -1.0;
-    vc.ring[n & 15u] += sawW * saw + pulseW * pul + subW * vc.sub;
-    const uint32_t o = (n - static_cast<uint32_t>(BlepTable::kDelay)) & 15u;
+    vc.ring[n & BlepTable::kMask] += sawW * saw + pulseW * pul + subW * vc.sub;
+    const uint32_t o = (n - static_cast<uint32_t>(bt.delay())) & BlepTable::kMask;
     double x = vc.ring[o];
     vc.ring[o] = 0.0;
     vc.ringPos = n + 1;
@@ -1135,7 +1147,9 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
     if (capThis && H.capEnv) H.capEnv[base + i] = vc.env;
     if (capThis && H.capEnvRc) H.capEnvRc[base + i] = envV;
     if (capThis && H.capVca) H.capVca[base + i] = gv;
-    bus[i] += y * gv * vcaGain;
+    const double vout = y * gv * vcaGain;
+    if (capThis && H.capVoiceOut) H.capVoiceOut[base + i] = vout;
+    bus[i] += vout;
   }
   // free detection (R-E11 glossary)
   if (vc.active && !vc.held) {
@@ -1145,9 +1159,15 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
 
 void Engine::renderSegment(float* L, float* R, int n) {
   const int nOs = n * os_;
+  if (testSkipVoices) {
+    for (int i = 0; i < n; ++i) L[i] = R[i] = 0.0f;
+    pos_ += n;
+    return;
+  }
   for (int i = 0; i < n; ++i) {
     const double w = noiseRng_.nextBipolar() + noiseRng_.nextBipolar() + noiseRng_.nextBipolar();
     noiseHost_[i] = k::kNoiseRms * w;
+    if (hooks.capNoiseHost) hooks.capNoiseHost[hooks.hostPos + i] = noiseHost_[i];
   }
   if (os_ == 2) {
     for (int i = 0; i < n; ++i) intFinal_.interpolate(noiseHost_[i], noiseOs_[2 * i], noiseOs_[2 * i + 1]);
@@ -1164,11 +1184,7 @@ void Engine::renderSegment(float* L, float* R, int n) {
     }
   }
   for (int m = 0; m < nOs; ++m) bus_[m] = 0.0;
-  if (!testSkipVoices) {
-    for (int vi = 0; vi < k::kVoices; ++vi) renderVoice(v_[vi], vi, nOs, bus_.data());
-  } else {
-    // control-only: keep the 60 envelopes and free detection running cheaply is not needed
-  }
+  for (int vi = 0; vi < k::kVoices; ++vi) renderVoice(v_[vi], vi, nOs, bus_.data());
   if (os_ == 2) {
     for (int i = 0; i < n; ++i) dry_[i] = decFinal_.decimate(bus_[2 * i], bus_[2 * i + 1]);
   } else {

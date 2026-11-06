@@ -11,7 +11,9 @@ namespace vjn6 {
 
 struct Vcf {
   double s[4] = {0, 0, 0, 0};    // TPT integrator states
-  double tg[4] = {1, 1, 1, 1};   // secant gains tanh(v)/v of the stage inputs (previous sample)
+  double tg[4] = {1, 1, 1, 1};   // secant gains tanh(v)/v used for the current sample
+  double v1[4] = {0, 0, 0, 0};   // stage input / V_sat at n-1
+  double v2[4] = {0, 0, 0, 0};   // stage input / V_sat at n-2
   double y4 = 0.0;               // last output
   double tfb = 1.0;              // secant gain of the feedback tanh (initial guess)
 
@@ -19,6 +21,7 @@ struct Vcf {
     for (int i = 0; i < 4; ++i) {
       s[i] = 0.0;
       tg[i] = 1.0;
+      v1[i] = v2[i] = 0.0;
     }
     y4 = 0.0;
     tfb = 1.0;
@@ -59,7 +62,11 @@ struct Vcf {
     for (int i = 0; i < 4; ++i) {
       const double yi = a[i] * in + b[i];
       s[i] = 2.0 * yi - s[i] + dn;
-      tg[i] = secant((in - yi) / Vs);
+      const double v = (in - yi) / Vs;
+      // secant gain for the next sample at the linearly predicted stage input (second-order lag)
+      tg[i] = secant(2.0 * v - v1[i]);
+      v2[i] = v1[i];
+      v1[i] = v;
       in = yi;
     }
     y4 = in;
