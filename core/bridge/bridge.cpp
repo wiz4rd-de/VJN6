@@ -251,6 +251,12 @@ bool Bridge::commandFromJson(const std::string& text, Command& c) {
     for (std::size_t i = 0; i < bytes->arr.size(); ++i) c.data[i] = static_cast<uint8_t>(bytes->arr[i].i & 0xFF);
     return true;
   }
+  if (t == "midiInputGone") {
+    c.type = CommandType::MidiPortGone;
+    c.src = Source::System;
+    c.port = static_cast<uint8_t>(getInt(v, "port") & 15);
+    return true;
+  }
   if (t == "selectSlot") {
     c = Command::selectSlot(static_cast<int>(getInt(v, "slot")), getSrc(v, Source::Overlay));
     return true;

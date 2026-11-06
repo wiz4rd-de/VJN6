@@ -52,16 +52,16 @@ describe('Web MIDI (§5.6, R-M1, R-M2)', () => {
     ]);
   });
 
-  it('a disabled or vanished input stops forwarding and acts as CC123 on the receive channel', async () => {
+  it('a disabled or vanished input stops forwarding and acts as CC123 for its notes (midiInputGone)', async () => {
     const t = setup();
     await t.midi.request(t.nav);
     t.midi.setInputEnabled('a', false);
     expect(t.persisted.at(-1)).toEqual({ disabledInputs: ['a'], output: '' });
-    expect(t.sent.at(-1)).toEqual({ t: 'midiIn', port: 1, bytes: [0xb2, 123, 0] });
+    expect(t.sent.at(-1)).toEqual({ t: 'midiInputGone', port: 1 });
     expect(t.inputs.get('a')!.onmidimessage).toBeNull();
     t.inputs.get('b')!.state = 'disconnected';
     t.access.onstatechange!();
-    expect(t.sent.at(-1)).toEqual({ t: 'midiIn', port: 2, bytes: [0xb2, 123, 0] });
+    expect(t.sent.at(-1)).toEqual({ t: 'midiInputGone', port: 2 });
     expect(t.midi.inputs().map((i) => i.id)).toEqual(['a']); // unplugged devices vanish silently
   });
 

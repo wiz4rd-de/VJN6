@@ -76,8 +76,7 @@ export class WebMidi {
   private allNotesOff(id: string): void {
     const port = this.ports.get(id);
     if (port === undefined) return;
-    const ch = Math.min(16, Math.max(1, this.deps.channel())) - 1;
-    this.deps.send({ t: 'midiIn', port, bytes: [0xb0 | ch, 123, 0] });
+    this.deps.send({ t: 'midiInputGone', port });
   }
 
   private onMessage(id: string, e: MIDIMessageEvent): void {

@@ -143,6 +143,7 @@ export type UiMessage =
   | { t: 'note'; n: number; vel: number }
   | { t: 'pedal'; on: boolean }
   | { t: 'midiIn'; port: number; bytes: number[] }
+  | { t: 'midiInputGone'; port: number }
   | { t: 'selectSlot'; slot: number }
   | { t: 'rename'; slot: number; name: string }
   | { t: 'copySlot'; from: number; to: number }

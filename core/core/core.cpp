@@ -486,6 +486,10 @@ void Core::handleCommand(const Command& c) {
     case CommandType::ReleaseAll:
       releaseKeyboard();
       return;
+    case CommandType::MidiPortGone:
+      // acts as CC123 for the notes of every channel of that input; clears the HOLD set and arpeggio
+      for (uint32_t ch = 0; ch < 16; ++ch) engine_.releaseSource(1u + static_cast<uint32_t>(c.port) * 16u + ch);
+      return;
     case CommandType::Gesture:
     case CommandType::None:
       return;

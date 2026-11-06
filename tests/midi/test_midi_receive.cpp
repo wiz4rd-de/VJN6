@@ -612,3 +612,39 @@ TEST_CASE("AC-M2.1 SysEx in 1-byte chunks with F8, a 30-byte SysEx, running stat
     }
   }
 }
+
+TEST_CASE("AC-M1.5 a vanished MIDI input releases only its own notes (R-M1)", "[midi]") {
+  vjn6::test::Rig r(48000.0, vjn6::Mode::J60, 2);
+  r.testPatch();
+  r.toBoundary();
+  vjn6::Command a;
+  a.type = vjn6::CommandType::MidiIn;
+  a.src = vjn6::Source::System;
+  a.port = 1;
+  a.len = 3;
+  a.data[0] = 0x90;
+  a.data[1] = 60;
+  a.data[2] = 100;
+  r.inst->post(a);
+  vjn6::Command b = a;
+  b.port = 2;
+  b.data[1] = 64;
+  r.inst->post(b);
+  r.skip(256);
+  int held = 0;
+  for (int v = 0; v < 6; ++v) held += r.eng().voice(v).held ? 1 : 0;
+  REQUIRE(held == 2);
+  vjn6::Command gone;
+  gone.type = vjn6::CommandType::MidiPortGone;
+  gone.src = vjn6::Source::System;
+  gone.port = 1;
+  r.inst->post(gone);
+  r.skip(256);
+  int note60 = 0, note64 = 0;
+  for (int v = 0; v < 6; ++v) {
+    if (r.eng().voice(v).held && r.eng().voice(v).note == 60) ++note60;
+    if (r.eng().voice(v).held && r.eng().voice(v).note == 64) ++note64;
+  }
+  CHECK(note60 == 0);
+  CHECK(note64 == 1);
+}

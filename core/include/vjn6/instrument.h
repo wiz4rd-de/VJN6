@@ -65,6 +65,7 @@ enum class CommandType : uint8_t {
   ShowMessage,    // a = LedMessage
   ReleaseAll,     // editor close / window blur: keyboard notes, LFO TRIG, push, lever to centre
   Gesture,        // b = 1 begin / 0 end of a panel drag on field a (rate-limited transmit flush)
+  MidiPortGone,   // port: a MIDI input disappeared or was disabled (acts as CC123 for its notes, R-M1)
 };
 
 enum class LedMessage : uint8_t { None = 0, Protected, Format, Received, WriteOk, Reset };
