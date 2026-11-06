@@ -1,0 +1,74 @@
+/* VJN6 visual tokens (SPEC §11), frozen. Final colour tuning is a human follow-up (§15.4). */
+:root {
+  --body: #1C1A18;  --panel-60: #141414;  --panel-106: #4B4F55;
+  --overlay: #24221F;  --tooltip: #0E0E0E;
+  --wood: #5A3A22;  --legend: #ECE8DC;  --legend-dim: #A9A49A;
+  --box-red: #C8403A;  --box-blue: #3E7BC4;  --box-white: #E6E4DE;
+  --cap-orange: #E8782E;  --cap-yellow: #E5C540;  --cap-grey: #9A9A96;  --cap-white: #EDEDEA;  --cap-blue: #4A86CC;
+  --slider-track: #0E0E0E;  --slider-cap: #D9D9D6;
+  --led-on: #FF3B2F;  --led-off: #3A1512;  --lamp-on: #FF5A48;
+}
+
+/* Fonts (SIL OFL 1.1, licences in ./fonts): latin subsets taken from @fontsource/barlow-condensed
+   5.2.8 and @fontsource/oswald 5.2.8. Bundled; nothing loads from a CDN. */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('./fonts/barlow-condensed-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url('./fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('./fonts/oswald-latin-500-normal.woff2') format('woff2');
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--body);
+  color: var(--legend);
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  height: 100%;
+}
+
+/* R-U3: the visible focus ring is 2 px --legend. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--legend);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+select {
+  font-family: inherit;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
