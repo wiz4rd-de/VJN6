@@ -14,6 +14,7 @@ if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 include(cmake/Determinism.cmake)
+include(cmake/LicenceTests.cmake)
 
 add_subdirectory(core)
 

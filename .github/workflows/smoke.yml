@@ -1,0 +1,42 @@
+# VJN6 post-merge smoke (owner rule, phase 2): after a merge to main, confirm the merged tree builds and
+# its smoke tests pass, without re-running the full suite (ci.yml ran it on the pull request).
+# Core only: no plugin, no web build, no UI.
+name: Smoke
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  smoke:
+    name: Post-merge smoke (core + [smoke] tests + licence check)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out Catch2 (JUCE is not needed for the core)
+        run: git submodule update --init --depth 1 third_party/Catch2
+
+      - name: Licence check
+        run: python3 tools/check_licences.py
+
+      - name: Configure the core and the test suite
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVJN6_BUILD_PLUGIN=OFF -DVJN6_BUILD_TESTS=ON
+
+      - name: Build vjn6_tests
+        run: cmake --build build --target vjn6_tests --parallel
+
+      - name: Smoke tests
+        run: ./build/tests/vjn6_tests "[smoke]"
