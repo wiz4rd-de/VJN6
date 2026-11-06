@@ -523,10 +523,12 @@ void Engine::unisonUpdate(bool retrigger) {
     return;
   }
   if (!retrigger) return;
-  for (Voice& vc : v_) startNote(vc, top->key, top->note, 64, true);
+  for (Voice& vc : v_) startNote(vc, top->key, top->note, top->vel, true);
 }
 
 void Engine::noteOn(uint32_t key, int note, int vel) {
+  // R-E8: the state before this note-on (a HOLD-set replacement below releases latched voices first)
+  const bool idle = !anyHeld() && !arpRunning();
   KeyEntry* e = findKey(key);
   // HOLD (60): a new key while no keys are physically down replaces the HOLD set
   if (mode_ == Mode::J60 && holdOn_) {
@@ -553,7 +555,6 @@ void Engine::noteOn(uint32_t key, int note, int vel) {
       e = findKey(key);
     }
   }
-  const bool idle = !anyHeld() && !arpRunning();
   if (!e) {
     if (nKeys_ >= 64) return;
     e = &keys_[nKeys_++];
@@ -563,6 +564,7 @@ void Engine::noteOn(uint32_t key, int note, int vel) {
   }
   e->down = true;
   e->pedal = false;
+  e->vel = vel;
   e->order = ++keyOrder_;
   if (mode_ == Mode::J60 && holdOn_ && !e->hold) {
     e->hold = true;
@@ -649,6 +651,9 @@ void Engine::pedal(bool down) {
 void Engine::holdChanged(bool on) {
   if (on == holdOn_) return;
   holdOn_ = on;
+  // HOLD is a 60-mode setting: in 106 mode it only takes effect after a switch to 60 mode, which starts
+  // with an empty HOLD set (§4.2, F-12)
+  if (mode_ != Mode::J60) return;
   if (on) {
     for (int i = 0; i < nKeys_; ++i)
       if (keys_[i].down) {
@@ -772,16 +777,7 @@ void Engine::arpRebuild() {
   arpCount_ = 0;
   for (int n = 0; n < 128; ++n)
     if (present[n]) arpNotes_[arpCount_++] = n;
-  const int range = perf(P_ARP_RANGE) < 1 ? 1 : (perf(P_ARP_RANGE) > 3 ? 3 : perf(P_ARP_RANGE));
-  bool pat[128] = {};
-  for (int o = 0; o < range; ++o)
-    for (int i = 0; i < arpCount_; ++i) {
-      const int p = arpNotes_[i] + 12 * o;
-      if (p <= 127) pat[p] = true;  // steps above 127 are skipped
-    }
-  arpPatternLen_ = 0;
-  for (int n = 0; n < 128; ++n)
-    if (pat[n]) arpPattern_[arpPatternLen_++] = n;
+  arpBuildPattern();
   if (before == 0 && arpCount_ > 0) {
     // notes arrive: the arpeggio starts from its first step
     arpLastPitch_ = -1;
@@ -790,9 +786,13 @@ void Engine::arpRebuild() {
     if (clockRunning) {
       arpWaitFirstClock_ = true;
       arpClockCount_ = 0;
-      arpNextTime_ = static_cast<double>(lastF8_) + k::kClockTimeoutS * fs_;
+      arpNextTime_ = static_cast<double>(lastF8_) + k::kClockTimeoutS * fs_;  // if the clock stops first
     } else {
-      arpStep(pos_);
+      // The first step plays at this note-on's position, but through arpEvent() after every event of
+      // this control boundary is applied, so a chord whose notes arrive one by one starts on its
+      // first step (UP: lowest, DOWN: highest).
+      arpWaitFirstClock_ = false;
+      arpNextTime_ = static_cast<double>(pos_);
     }
   } else if (before > 0 && arpCount_ == 0) {
     arpStopNote();
@@ -855,8 +855,22 @@ void Engine::arpStopNote() {
   arpOffTime_ = -1;
 }
 
+void Engine::arpBuildPattern() {
+  const int range = perf(P_ARP_RANGE) < 1 ? 1 : (perf(P_ARP_RANGE) > 3 ? 3 : perf(P_ARP_RANGE));
+  bool pat[128] = {};
+  for (int o = 0; o < range; ++o)
+    for (int i = 0; i < arpCount_; ++i) {
+      const int p = arpNotes_[i] + 12 * o;
+      if (p <= 127) pat[p] = true;  // steps above 127 are skipped
+    }
+  arpPatternLen_ = 0;
+  for (int n = 0; n < 128; ++n)
+    if (pat[n]) arpPattern_[arpPatternLen_++] = n;
+}
+
 void Engine::arpStep(int64_t at) {
   arpStopNote();
+  arpBuildPattern();  // a RANGE change takes effect at the next step
   const int pitch = arpNextPitch();
   if (pitch < 0) return;
   arpLastPitch_ = pitch;
@@ -884,7 +898,9 @@ void Engine::arpStep(int64_t at) {
 int64_t Engine::nextArpEvent() const {
   int64_t t = INT64_MAX;
   if (arpOffTime_ >= 0 && arpOffTime_ < t) t = arpOffTime_;
-  if (arpNextTime_ >= 0.0 && arpCount_ > 0 && !arpWaitFirstClock_) {
+  // While waiting for the first F8 (notes appeared or FA received), arpNextTime_ holds the time at which
+  // the clock counts as stopped and internal timing resumes.
+  if (arpNextTime_ >= 0.0 && arpCount_ > 0) {
     const int64_t s = static_cast<int64_t>(std::ceil(arpNextTime_));
     if (s < t) t = s;
   }
@@ -900,10 +916,10 @@ void Engine::arpEvent() {
     arpOffTime_ = -1;
     arpSoundingNote_ = -1;
   }
-  if (arpNextTime_ >= 0.0 && arpCount_ > 0 && !arpWaitFirstClock_ &&
-      static_cast<int64_t>(std::ceil(arpNextTime_)) <= pos_) {
+  if (arpNextTime_ >= 0.0 && arpCount_ > 0 && static_cast<int64_t>(std::ceil(arpNextTime_)) <= pos_) {
     const bool clockRunning = lastF8_ >= 0 && static_cast<double>(pos_ - lastF8_) < k::kClockTimeoutS * fs_;
     if (!clockRunning) {
+      arpWaitFirstClock_ = false;  // internal timing (also when the clock stopped before the awaited F8)
       const double exact = arpNextTime_;
       arpStep(pos_);
       // internal timing keeps the exact fractional grid
@@ -944,6 +960,8 @@ void Engine::clockStart() {
 }
 
 void Engine::arpChanged(bool on) {
+  // a 60-mode setting: no effect in 106 mode; in 60 mode the arpeggio starts on the next note-on (§4.2, F-12)
+  if (mode_ != Mode::J60) return;
   if (on) {
     // directly sounding notes become arpeggio notes
     for (Voice& vc : v_)
@@ -957,7 +975,7 @@ void Engine::arpChanged(bool on) {
     arpNextTime_ = -1.0;
     // held keys sound again through the key assigner
     for (int i = 0; i < nKeys_; ++i)
-      if (keyGate(keys_[i])) assignNoteOn(keys_[i].key, keys_[i].note, 64);
+      if (keyGate(keys_[i])) assignNoteOn(keys_[i].key, keys_[i].note, keys_[i].vel);
   }
 }
 
@@ -1149,6 +1167,7 @@ void Engine::renderVoice(Voice& vc, int vi, int nOs, double* bus) {
     if (capThis && H.capVca) H.capVca[base + i] = gv;
     const double vout = y * gv * vcaGain;
     if (capThis && H.capVoiceOut) H.capVoiceOut[base + i] = vout;
+    if (H.capAllVoices) H.capAllVoices[(base + i) * 6 + vi] = vout;
     bus[i] += vout;
   }
   // free detection (R-E11 glossary)

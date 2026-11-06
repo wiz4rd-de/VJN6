@@ -34,6 +34,7 @@ void ParallelLp5::design(double fReal, double fq1, double q1, double fq2, double
     p[s] = P[i];
     r[s] = cdiv(Cx{K, 0.0}, den);
   }
+  r[0].im = 0.0;  // the real pole's residue is real (no rounding residue that could go subnormal)
 }
 
 void Chorus::prepare(double fs) {
@@ -172,6 +173,7 @@ void Chorus::processLine(int c, double in, double noise, double dn, double& wet)
   double y = 0.0;
   for (int s = 0; s < 3; ++s) {
     xo[s].re += dn;
+    xo[s].im += dn;
     L.xout[s] = xo[s];
     y += (s == 0 ? 1.0 : 2.0) * xo[s].re;
   }
@@ -180,6 +182,7 @@ void Chorus::processLine(int c, double in, double noise, double dn, double& wet)
   for (int s = 0; s < 3; ++s) {
     Cx v = cadd(cmul(inE_[s], L.xin[s]), cscale(inR_[s], in));
     v.re += dn;
+    v.im += dn;
     L.xin[s] = v;
     yin += (s == 0 ? 1.0 : 2.0) * v.re;
   }

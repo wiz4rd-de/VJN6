@@ -75,6 +75,7 @@ struct EngineHooks {
   double* capCut = nullptr;           // oversampled: effective cutoff c_cal*fc in Hz
   double* capVca = nullptr;           // oversampled: VCA gain
   double* capVoiceOut = nullptr;      // oversampled: voice output after the VCA
+  double* capAllVoices = nullptr;     // oversampled, 6 per sample: every voice's output after the VCA
   double* capNoiseHost = nullptr;     // host rate: the shared noise source before upsampling
   const double* injChorusIn = nullptr;  // host rate
   double* capChorusIn = nullptr;
@@ -166,6 +167,7 @@ class Engine {
   struct KeyEntry {
     uint32_t key = 0;
     int note = 0;
+    int vel = 64;         // note-on velocity (UNISON returns and ARPEGGIO off re-sound with it)
     bool down = false;
     bool pedal = false;   // released while CC64 down
     bool hold = false;    // in the HOLD set (60)
@@ -196,6 +198,7 @@ class Engine {
   // arpeggio (60)
   bool arpOn() const { return mode_ == Mode::J60 && perf(P_ARP_ON) != 0; }
   void arpRebuild();
+  void arpBuildPattern();  // pitch-ordered steps of arpNotes_ over the current RANGE
   void arpStep(int64_t at);
   int arpNextPitch();
   double arpPeriodSamples() const;

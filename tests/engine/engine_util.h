@@ -108,6 +108,30 @@ inline double rampPeak(const std::vector<T>& x, const std::vector<double>& edges
   return best;
 }
 
+// Amplitude of a sawtooth independent of any DC offset: half the span of each fitted ramp.
+template <typename T>
+inline double rampAmplitude(const std::vector<T>& x, const std::vector<double>& edges, double period, double frac) {
+  double sum = 0.0;
+  int count = 0;
+  const double w = frac * period;
+  for (std::size_t e = 0; e + 1 < edges.size(); ++e) {
+    const double a = edges[e], b = edges[e + 1];
+    if (b - a < 0.5 * period) continue;
+    double sx = 0, sy = 0, sxx = 0, sxy = 0;
+    int n = 0;
+    for (long i = static_cast<long>(std::ceil(a + w)); i <= static_cast<long>(std::floor(b - w)); ++i) {
+      if (i < 0 || static_cast<std::size_t>(i) >= x.size()) continue;
+      const double t = static_cast<double>(i), y = static_cast<double>(x[static_cast<std::size_t>(i)]);
+      sx += t; sy += y; sxx += t * t; sxy += t * y; ++n;
+    }
+    if (n < 8) continue;
+    const double slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    sum += std::fabs(slope * (b - a)) * 0.5;
+    ++count;
+  }
+  return count ? sum / count : 0.0;
+}
+
 inline double noteHz(int note) { return 440.0 * std::pow(2.0, (note - 69) / 12.0); }
 
 }  // namespace vjn6::test
