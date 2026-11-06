@@ -1,0 +1,331 @@
+// Front panel: AC-P1.1 (UI part: control map per mode, 60 chorus toggles), AC-U4.1 (combination press)
+// and AC-S3.3 (a mocked MIDI CC is visible within 100 ms).
+import type { Page } from '@playwright/test';
+import { ctl, expect, F, midi, openAndStart, P, setMode, state, test, waitForState, type CoreState } from './fixtures';
+
+type Target = { field: number } | { perf: number } | { lever: true } | { button: true };
+
+/** §5.2 controls per mode with their §4.1 / §4.2 binding (R-P1); ids are the panel's data-testids. */
+const SLIDERS: Record<string, number> = {
+  'lfo-rate': F.LFO_RATE,
+  'lfo-delay': F.LFO_DELAY,
+  'dco-lfo': F.DCO_LFO,
+  'dco-pwm': F.DCO_PWM,
+  'sub-level': F.SUB_LEVEL,
+  noise: F.NOISE,
+  'vcf-freq': F.VCF_FREQ,
+  'vcf-res': F.VCF_RES,
+  'vcf-env': F.VCF_ENV,
+  'vcf-lfo': F.VCF_LFO,
+  'vcf-kybd': F.VCF_KYBD,
+  'vca-level': F.VCA_LEVEL,
+  'env-a': F.ENV_A,
+  'env-d': F.ENV_D,
+  'env-s': F.ENV_S,
+  'env-r': F.ENV_R,
+};
+
+const BOTH: Record<string, Target> = {
+  volume: { perf: P.VOLUME },
+  'bend-dco': { perf: P.BEND_DCO },
+  'bend-vcf': { perf: P.BEND_VCF },
+  lever: { lever: true },
+  ...Object.fromEntries(Object.entries(SLIDERS).map(([id, field]) => [id, { field }])),
+  'pwm-mode': { field: F.PWM_SRC },
+  'range-16': { field: F.RANGE },
+  'range-8': { field: F.RANGE },
+  'range-4': { field: F.RANGE },
+  pulse: { field: F.PULSE },
+  saw: { field: F.SAW },
+  hpf: { field: F.HPF },
+  'vcf-pol': { field: F.VCF_POL },
+  'vca-mode': { field: F.VCA_MODE },
+  'chorus-i': { field: F.CHORUS },
+  'chorus-ii': { field: F.CHORUS },
+  ...Object.fromEntries([1, 2, 3, 4, 5].map((i) => [`bank-${i}`, { button: true }])),
+  ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((i) => [`patch-${i}`, { button: true }])),
+  manual: { button: true },
+  write: { button: true },
+  tune: { perf: P.TUNE },
+};
+
+const ONLY_60: Record<string, Target> = {
+  'oct-transpose': { perf: P.OCT_TRANSPOSE },
+  'lfo-trig': { button: true },
+  'lfo-mode': { perf: P.LFO_TRIG_MODE },
+  sub: { field: F.SUB },
+  hold: { perf: P.HOLD },
+  'arp-on': { perf: P.ARP_ON },
+  'arp-mode': { perf: P.ARP_MODE },
+  'arp-range': { perf: P.ARP_RANGE },
+  'arp-rate': { perf: P.ARP_RATE },
+};
+
+const ONLY_106: Record<string, Target> = {
+  'lfo-trig-sens': { perf: P.LFO_TRIG_SENS },
+  'porta-time': { perf: P.PORTA_TIME },
+  'chorus-off': { field: F.CHORUS },
+  'group-a': { button: true },
+  'group-b': { button: true },
+  'bank-6': { button: true },
+  'bank-7': { button: true },
+  'bank-8': { button: true },
+  'poly-1': { perf: P.KEY_MODE },
+  'poly-2': { perf: P.KEY_MODE },
+  portamento: { perf: P.PORTA_ON },
+  'key-transpose': { button: true },
+};
+
+/** The ids of every control drawn on the panel (position labels of switches excluded). */
+async function controlIds(page: Page): Promise<string[]> {
+  const ids = await page
+    .locator('[data-testid^="ctl-"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')!.slice(4)).filter((id) => !id.includes('-pos-')));
+  return ids.sort();
+}
+
+function read(s: CoreState, t: Target): number {
+  if ('field' in t) return s.edit[t.field];
+  if ('perf' in t) return s.perf[t.perf];
+  if ('lever' in t) return s.lever;
+  return NaN;
+}
+
+/** Moves a slider, knob, switch or lever with the keyboard (R-U1a) and checks its bound value moved. */
+async function moveAndCheck(page: Page, id: string, t: Target): Promise<void> {
+  const loc = ctl(page, id);
+  const role = await loc.getAttribute('role');
+  if ('button' in t || role !== 'slider') return; // buttons are checked by the dedicated tests
+  const before = read(await state(page), t);
+  await loc.focus();
+  if ('lever' in t) {
+    await page.keyboard.down('ArrowRight');
+    await waitForState(page, (s) => s.lever === 8191, `${id}: lever fully right while held`);
+    await page.keyboard.up('ArrowRight');
+    await waitForState(page, (s) => s.lever === 0, `${id}: lever back to centre`);
+    return;
+  }
+  const isSwitch = (await loc.getAttribute('data-field')) !== null;
+  if (isSwitch) {
+    // Up moves towards the top position; from the top, Down (R-U1a)
+    const atTop = await page.locator(`[data-testid^="ctl-${id}-pos-"]`).first().evaluate((e) => e.classList.contains('active'));
+    await page.keyboard.press(atTop ? 'ArrowDown' : 'ArrowUp');
+    await expect.poll(async () => read(await state(page), t), { message: `${id} moves its field` }).not.toBe(before);
+    await expect(loc).toHaveAttribute('data-value', String(read(await state(page), t)));
+    return;
+  }
+  const max = Number(await loc.getAttribute('aria-valuemax'));
+  const key = before === max ? 'Home' : 'End';
+  await page.keyboard.press(key);
+  const want = key === 'Home' ? 0 : max;
+  await waitForState(page, (s) => read(s, t) === want, `${id} → ${want}`);
+  await expect(loc).toHaveAttribute('data-value', String(want));
+}
+
+const TOGGLES: Record<string, Target> = {
+  pulse: { field: F.PULSE },
+  saw: { field: F.SAW },
+  sub: { field: F.SUB },
+  hold: { perf: P.HOLD },
+  'arp-on': { perf: P.ARP_ON },
+  portamento: { perf: P.PORTA_ON },
+};
+
+/** Clicks every button of the mode and checks the field, setting or panel state it is bound to (§5.2). */
+async function pressButtons(page: Page, mode: '60' | '106'): Promise<void> {
+  for (const [id, t] of Object.entries(TOGGLES)) {
+    if (!(await ctl(page, id).count())) continue;
+    const before = read(await state(page), t);
+    await ctl(page, id).click();
+    await waitForState(page, (s) => read(s, t) === 1 - before, `${id} toggles`);
+    await expect(ctl(page, id)).toHaveAttribute('data-lit', String(before === 0));
+  }
+  for (const [i, id] of ['range-16', 'range-8', 'range-4'].entries()) {
+    await ctl(page, id).click();
+    await waitForState(page, (s) => s.edit[F.RANGE] === i, `${id} → W0 = ${i}`);
+    await expect(ctl(page, id)).toHaveAttribute('data-lit', 'true');
+  }
+  if (mode === '106') {
+    for (const [id, w4] of [['chorus-ii', 2], ['chorus-i', 1], ['chorus-off', 0]] as const) {
+      await ctl(page, id).click();
+      await waitForState(page, (s) => s.edit[F.CHORUS] === w4, `${id} → W4 = ${w4}`);
+    }
+    for (const [id, km] of [['poly-2', 1], ['poly-1', 0]] as const) {
+      await ctl(page, id).click();
+      await waitForState(page, (s) => s.perf[P.KEY_MODE] === km, `${id} → key mode ${km}`);
+    }
+    await ctl(page, 'group-b').click();
+    await waitForState(page, (s) => s.pendingGroup === 1, 'GROUP B');
+    await ctl(page, 'group-a').click();
+    await waitForState(page, (s) => s.pendingGroup === 0, 'GROUP A');
+    await ctl(page, 'key-transpose').click();
+    await waitForState(page, (s) => s.ktArmed, 'KEY TRANSPOSE arms');
+    await expect(page.getByTestId('led')).toHaveAttribute('data-raw-text', 't-');
+    await ctl(page, 'key-transpose').click();
+    await waitForState(page, (s) => !s.ktArmed, 'KEY TRANSPOSE disarms');
+  } else {
+    const trig = ctl(page, 'lfo-trig');
+    await trig.hover();
+    await page.mouse.down();
+    await waitForState(page, (s) => s.lfoTrig, 'LFO TRIG held');
+    await expect(trig).toHaveAttribute('data-lit', 'true');
+    await page.mouse.up();
+    await waitForState(page, (s) => !s.lfoTrig, 'LFO TRIG released');
+  }
+  const banks = mode === '60' ? 5 : 8;
+  for (let b = 1; b <= banks; b++) {
+    await ctl(page, `bank-${b}`).click();
+    await waitForState(page, (s) => s.pendingBank === b, `BANK ${b}`);
+  }
+  await ctl(page, 'bank-2').click();
+  for (let p = 1; p <= 8; p++) {
+    await ctl(page, `patch-${p}`).click();
+    await waitForState(page, (s) => s.slot === 8 + p && !s.manual, `PATCH ${p} → slot ${8 + p}`);
+    await expect(page.getByTestId('led')).toHaveAttribute('data-text', `2${p}`);
+  }
+  await ctl(page, 'manual').click();
+  await waitForState(page, (s) => s.manual, 'MANUAL');
+  await expect(page.getByTestId('led')).toHaveAttribute('data-text', '--');
+  await ctl(page, 'write').click();
+  await waitForState(page, (s) => s.writeArmed, 'WRITE arms');
+  await ctl(page, 'write').click();
+  await waitForState(page, (s) => !s.writeArmed, 'WRITE again cancels');
+}
+
+test.describe('AC-P1.1 control map (UI part)', () => {
+  for (const mode of ['60', '106'] as const) {
+    test(`AC-P1.1 ${mode} mode: every control is present only in its mode and moves its §4.1/§4.2 field or action`, async ({
+      page,
+    }) => {
+      await openAndStart(page);
+      if (mode === '106') await setMode(page, '106');
+      const own = mode === '60' ? ONLY_60 : ONLY_106;
+      const expected = { ...BOTH, ...own };
+      expect(await controlIds(page)).toEqual(Object.keys(expected).sort());
+      for (const id of Object.keys(mode === '60' ? ONLY_106 : ONLY_60)) {
+        if (!(id in expected)) await expect(ctl(page, id), `${id} is not drawn in ${mode} mode`).toHaveCount(0);
+      }
+      // mode-specific forms of shared controls (§5.2)
+      if (mode === '60') {
+        await expect(ctl(page, 'hpf')).toHaveAttribute('data-field', 'field'); // 4-position switch
+        await expect(ctl(page, 'hpf-pos-3')).toHaveCount(1);
+        await expect(ctl(page, 'pwm-mode-pos-2')).toHaveText('ENV');
+        await expect(ctl(page, 'vcf-pol-pos-1')).toHaveText('−');
+      } else {
+        await expect(ctl(page, 'hpf')).not.toHaveAttribute('data-field', /.*/); // 4-position slider
+        await expect(ctl(page, 'hpf')).toHaveAttribute('aria-valuemax', '3');
+        await expect(ctl(page, 'pwm-mode-pos-2')).toHaveCount(0);
+        await expect(ctl(page, 'vcf-pol-pos-1')).toHaveText('INVERTED');
+      }
+      await expect(page.getByTestId('mode-badge')).toHaveText(mode);
+
+      for (const [id, t] of Object.entries(expected)) await moveAndCheck(page, id, t);
+      await pressButtons(page, mode);
+    });
+  }
+
+  test('AC-P1.1 60 mode: the chorus I and II buttons toggle off / I / II / I+II', async ({ page }) => {
+    await openAndStart(page);
+    const i = ctl(page, 'chorus-i');
+    const ii = ctl(page, 'chorus-ii');
+    expect((await state(page)).edit[F.CHORUS]).toBe(0); // INIT, slot 1
+    const steps: [typeof i, number, boolean, boolean][] = [
+      [i, 1, true, false], // off → I
+      [ii, 3, true, true], // I → I+II
+      [i, 2, false, true], // I+II → II
+      [ii, 0, false, false], // II → off
+      [ii, 2, false, true], // off → II
+      [i, 3, true, true], // II → I+II
+    ];
+    for (const [btn, w4, litI, litII] of steps) {
+      await btn.click();
+      await waitForState(page, (s) => s.edit[F.CHORUS] === w4, `W4 = ${w4}`);
+      await expect(i).toHaveAttribute('data-lit', String(litI));
+      await expect(ii).toHaveAttribute('data-lit', String(litII));
+    }
+  });
+});
+
+test('AC-U4.1 106 mode, POLY 1 lit: Shift+click POLY 2 → UNISON; Shift+click POLY 1 → unchanged; click POLY 1 → POLY 1', async ({
+  page,
+}) => {
+  await openAndStart(page);
+  await setMode(page, '106');
+  const p1 = ctl(page, 'poly-1');
+  const p2 = ctl(page, 'poly-2');
+  expect((await state(page)).perf[P.KEY_MODE]).toBe(0);
+  await expect(p1).toHaveAttribute('data-lit', 'true');
+  await expect(p2).toHaveAttribute('data-lit', 'false');
+
+  await p2.click({ modifiers: ['Shift'] });
+  await waitForState(page, (s) => s.perf[P.KEY_MODE] === 2, 'UNISON');
+  await expect(p1).toHaveAttribute('data-lit', 'true');
+  await expect(p2).toHaveAttribute('data-lit', 'true');
+
+  const seq = (await state(page)).seq;
+  await p1.click({ modifiers: ['Shift'] });
+  await page.waitForTimeout(250);
+  const s = await state(page);
+  expect(s.perf[P.KEY_MODE], 'repeating the active combination does nothing').toBe(2);
+  expect(s.seq).toBe(seq);
+  await expect(p1).toHaveAttribute('data-lit', 'true');
+  await expect(p2).toHaveAttribute('data-lit', 'true');
+
+  await p1.click();
+  await waitForState(page, (st) => st.perf[P.KEY_MODE] === 0, 'POLY 1');
+  await expect(p1).toHaveAttribute('data-lit', 'true');
+  await expect(p2).toHaveAttribute('data-lit', 'false');
+  // the tooltip names the Shift+click (R-U4)
+  await p2.hover();
+  await expect(page.getByTestId('tooltip')).toHaveText('POLY 2 — Shift+click with POLY 1 lit: UNISON');
+});
+
+test('AC-S3.3 web with mocked MIDI: CC74 64 injected → the FREQ slider shows 5.0 within 100 ms', async ({ page }) => {
+  await openAndStart(page, { audio: true });
+  const m = midi(page);
+  await m.waitListening();
+  const freq = ctl(page, 'vcf-freq');
+  await expect(freq).toHaveAttribute('data-value', '127');
+
+  // measured in the page: from the injected message to the slider's displayed value
+  const measure = (cc: number, shown: string) =>
+    page.evaluate(
+      ({ cc, shown }) =>
+        new Promise<number>((resolve) => {
+          const el = document.querySelector('[data-testid="ctl-vcf-freq"]')!;
+          const ok = () => (el.getAttribute('aria-valuetext') ?? '').startsWith(`VCF FREQ ${shown} = `);
+          const t0 = performance.now();
+          const obs = new MutationObserver(() => {
+            if (ok()) {
+              obs.disconnect();
+              resolve(performance.now() - t0);
+            }
+          });
+          obs.observe(el, { attributes: true });
+          window.__midiDouble!.inject([0xb0, 74, cc]);
+          setTimeout(() => {
+            obs.disconnect();
+            resolve(Infinity);
+          }, 2000);
+        }),
+      { cc, shown },
+    );
+
+  const times: number[] = [];
+  for (let k = 0; k < 5; k++) {
+    times.push(await measure(64, '5.0'));
+    await expect(freq).toHaveAttribute('data-value', '64');
+    await measure(127, '10.0');
+  }
+  test.info().annotations.push({ type: 'latency', description: times.map((t) => `${t.toFixed(1)} ms`).join(', ') });
+  for (const t of times) expect(t, 'CC74 → FREQ shows 5.0').toBeLessThanOrEqual(100);
+  await m.inject([0xb0, 74, 64]);
+  await expect(freq).toHaveAttribute('data-value', '64');
+  await expect(freq).toHaveAttribute('aria-valuetext', /^VCF FREQ 5\.0 = /);
+  await freq.hover();
+  await expect(page.getByTestId('tooltip')).toContainText('VCF FREQ 5.0 = ');
+  const s = await state(page);
+  expect(s.edit[F.VCF_FREQ]).toBe(64);
+  expect(s.edited).toBe(true); // an external change sets EDITED (R-S2) …
+  expect(s.slot).toBe(1); // … and never changes the slot
+});

@@ -225,3 +225,21 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
 - **UI bundle in the binary**: every file of `ui/dist` is embedded with `juce_add_binary_data`, staged as
   `ui<N>.<ext>` with a generated path table (MSBuild-safe names); without `ui/dist/index.html` the plugin is
   skipped with a configure warning (`npm run build` first).
+
+## End-to-end tests and web persistence
+
+- **Web final save (F-13)** also runs on `beforeunload` (WebKit keeps an IndexedDB write across a reload only
+  when it starts there) and only when the state changed since the last save, so a page closed while still
+  starting cannot overwrite the saved state with the first-run state. On load, the UI waits until the core
+  has applied the loaded state (its serialised state changes; at most 500 ms) before it sends `ready`, so
+  the first-run state is never shown (R-S3).
+- **AC-SC1** baselines: Chromium on Linux (generated in the official Playwright 1.65.0 Docker image,
+  amd64), the viewport sized to the canvas × scale with Zoom on Fit; both modes at 50/100/200 % plus the
+  bank manager and Settings; threshold 0.1 % of pixels. Skipped on other platforms and in WebKit.
+- **AC-U3.1 in WebKit** uses Option+Tab (Safari's plain Tab skips buttons by default, a browser
+  preference); the test tabs until VOLUME, then checks the complete R-U3 order.
+- **"No note sounds" (AC-U2.1)** = analyser RMS below −60 dBFS with chorus noise OFF.
+- **Web MIDI double** is installed in both browsers (AC-SC2, AC-S3.3); AC-B2's MIDI note is Chromium-only
+  (Safari has no Web MIDI). Drops of several files use a synthetic DataTransfer; "Cancel" is a file chooser
+  closed with no files; "IndexedDB disabled" hides `window.indexedDB`.
+- **Lever rounding**: ±30 px gives −4095 / +4096 (Math.round of ±4095.5); both are +-0.5 of the lever range.

@@ -14,6 +14,7 @@
     "build": "npm run build --workspace ui",
     "preview": "npm run preview --workspace ui",
     "test": "npm run test --workspace ui",
-    "check": "npm run check --workspace ui"
+    "check": "npm run check --workspace ui",
+    "test:e2e": "npm run test:e2e --workspace ui"
   }
 }

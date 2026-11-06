@@ -51,8 +51,8 @@ Used only to build and test VJN6. None of them is linked into or shipped with a 
 | --- | --- | --- |
 | Vite | MIT | UI dev server (`npm run web`, COOP/COEP headers) and production bundler (`npm run build`). |
 | Vitest | MIT | UI unit tests (`npm test`). |
-| Playwright | Apache-2.0 | End-to-end and screenshot tests in Chromium and WebKit (CI on Ubuntu). |
-| axe-core (via Playwright) | MPL-2.0 | Accessibility checks in the end-to-end tests (AC-U3.1); test only. |
+| Playwright (`@playwright/test` 1.65.0, with its Chromium and WebKit builds) | Apache-2.0 | End-to-end and screenshot tests in Chromium and WebKit (`npm run test:e2e`; CI on Ubuntu). The AC-SC1 baselines are rendered in the official `mcr.microsoft.com/playwright` Docker image (`npm run test:e2e:baselines`); nothing of it is committed or shipped. |
+| axe-core and `@axe-core/playwright` 4.14.0 | MPL-2.0 | Accessibility (missing-name) checks in the end-to-end tests (AC-U3.1); test only, unmodified, never shipped. |
 | @sveltejs/vite-plugin-svelte | MIT | Svelte compiler integration for Vite. |
 | svelte-check | MIT | Type checks of the Svelte/TypeScript sources (`npm run check`). |
 | TypeScript | Apache-2.0 | Type checking of the UI sources. |

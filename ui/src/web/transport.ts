@@ -30,6 +30,13 @@ export interface WebHooks {
 const POLL_MIN_MS = 15; // rAF at most ~60 Hz
 const HIDDEN_POLL_MS = 250;
 const MAX_FILE_BYTES = 1024 * 1024;
+const LOAD_WAIT_MS = 500; // longest wait for the core to apply the loaded state
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 
 export class WebTransport implements Transport {
   readonly kind = 'web' as const;
@@ -86,17 +93,58 @@ export class WebTransport implements Transport {
       this.hooks.fatal(MSG_WASM);
       return;
     }
+    const before = this.mod.saveState();
     this.mod.loadState(blob);
+    if (blob.length > 0) await this.loadApplied(before);
     this.mod.command(JSON.stringify({ t: 'ready' }));
     this.emitEnv();
     requestAnimationFrame(this.frame);
     setInterval(() => {
       if (document.hidden) this.pollOnce();
     }, HIDDEN_POLL_MS);
+    // Final save (F-13) on hide and pagehide, and already on beforeunload: WebKit keeps an IndexedDB
+    // write across a reload only when it starts in beforeunload (pagehide writes are dropped).
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') void this.saveNow();
+      if (document.visibilityState === 'hidden') this.finalSave();
     });
-    window.addEventListener('pagehide', () => void this.saveNow());
+    window.addEventListener('beforeunload', () => this.finalSave());
+    window.addEventListener('pagehide', () => this.finalSave());
+  }
+
+  /**
+   * Waits until the core has applied the state given to loadState(): it does so at its next render (the
+   * main-thread driver renders every 10 ms) and reports the previous state until then, which the UI must
+   * never show (R-S3). A loaded state equal to the previous one changes nothing, so the wait is capped.
+   */
+  private async loadApplied(before: Uint8Array): Promise<void> {
+    const t0 = performance.now();
+    while (this.mod && performance.now() - t0 < LOAD_WAIT_MS) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (!sameBytes(this.mod.saveState(), before)) return;
+    }
+  }
+
+  /**
+   * The final save: starts the IndexedDB write synchronously inside the event, and only when the state
+   * changed since the last save. The core applies a loaded state at its next render and saveState()
+   * serialises the last published state, so an unconditional save from a page that closes before that
+   * render would overwrite the stored state with the first-run state.
+   */
+  private finalSave(): void {
+    if (!this.mod || !this.store) return;
+    this.pollOnce(); // picks up a change published since the last frame (and may start a due save)
+    if (!this.sched.pending) return;
+    this.sched.saved();
+    let bytes: Uint8Array;
+    try {
+      bytes = this.mod.saveState();
+    } catch {
+      return;
+    }
+    this.store.put(KEY_CURRENT, bytes).catch(() => {
+      this.store = null;
+      this.hooks.storageFailed();
+    });
   }
 
   private frame = (t: number): void => {

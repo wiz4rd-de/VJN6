@@ -4,10 +4,15 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 // §15.2: the page must be cross-origin isolated (SharedArrayBuffer for the Wasm audio worklet),
 // both from the dev server (`npm run web`) and from `vite preview`.
-const isolationHeaders = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-};
+// End-to-end tests only (AC-SC2): VJN6_NO_ISOLATION=1 serves the page without these headers, to
+// check the "cross-origin isolation is off" message. Never set for `npm run web`.
+const isolationHeaders: Record<string, string> =
+  process.env.VJN6_NO_ISOLATION === '1'
+    ? {}
+    : {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      };
 
 export default defineConfig({
   // One bundle for every build (§9.4): the desktop WebView serves ui/dist from its own resource

@@ -138,7 +138,7 @@ to start audio.
 | Licence and branding | `ctest --test-dir build -C Release -L licence` or `python3 tools/check_licences.py` | see "Licence check" below |
 | pluginval (AC-PL1) | see below | strictness 5, VST3 on all desktop OSes, AU on macOS |
 | Vitest (UI unit tests) | `npm test` | `npm run check` runs svelte-check / TypeScript |
-| Playwright (end to end, Chromium + WebKit) | `npx playwright install --with-deps chromium webkit` once, then `npm run test:e2e` | needs `web/build.sh` first; screenshot baselines are taken on Linux (AC-SC1) |
+| Playwright (end to end, Chromium + WebKit) | `npx playwright install --with-deps chromium webkit` once, then `npm run test:e2e` | needs `web/build.sh` first; servers on 5173 (COOP/COEP) and 5174 (no isolation, AC-SC2), movable with `VJN6_E2E_PORT` / `VJN6_E2E_NOISO_PORT`; screenshot baselines (AC-SC1, Chromium on Linux) are regenerated in Docker with `npm run test:e2e:baselines --workspace ui` (`-- --check` compares without updating) |
 
 ### pluginval
 
