@@ -54,6 +54,7 @@ double Engine::ccal() const {
 int Engine::sw(int field) const {
   int v = patch_->v[field];
   if (v >= switchCount(field)) v = 0;  // out-of-range switch read as 0 (§4.1)
+  if (mode_ == Mode::J60 && field == W_RANGE) return 1;  // no RANGE on the Juno-60: read as 8' (§4.1, C-2)
   if (mode_ == Mode::J106) {
     if (field == W_SUB) return 1;
     if (field == W_CHORUS && v == 3) return 1;

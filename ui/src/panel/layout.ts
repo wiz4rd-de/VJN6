@@ -257,16 +257,17 @@ export const CONTROLS: readonly ControlDef[] = [
     x: 418,
     y: 200,
   },
+  // RANGE exists in 106 mode only (60 mode has no DCO RANGE, C-2); in 60 mode its place stays
+  // empty panel, because PULSE and SAW are shared with 106 mode and do not move (§5.2)
   ...([0, 1, 2] as const).map(
     (i): ButtonDef => ({
       kind: 'button',
       id: ['range-16', 'range-8', 'range-4'][i],
-      modes: 'both',
+      modes: '106',
       aria: ['RANGE 16′', 'RANGE 8′', 'RANGE 4′'][i],
       b: 'range',
       i,
       led: Led.RANGE16 + i,
-      cap60: 'grey',
       cap106: 'white',
       label: ['16′', '8′', '4′'][i],
       x: 468,
@@ -592,7 +593,7 @@ export const CONTROLS: readonly ControlDef[] = [
 
 export const TEXTS: readonly TextDef[] = [
   { id: 'bender-sens', modes: 'both', text: 'BENDER SENS', x: 110, y: 178, align: 'center', kind: 'group' },
-  { id: 'range', modes: 'both', text: 'RANGE', x: 481, y: 116, align: 'center', kind: 'group' },
+  { id: 'range', modes: '106', text: 'RANGE', x: 481, y: 116, align: 'center', kind: 'group' },
   { id: 'group', modes: '106', text: 'GROUP', x: 128, y: 538, align: 'left', kind: 'group' },
   { id: 'bank', modes: 'both', text: 'BANK', x: 206, y: 538, align: 'left', kind: 'group' },
   { id: 'patch', modes: 'both', text: 'PATCH', x: 502, y: 538, align: 'left', kind: 'group' },

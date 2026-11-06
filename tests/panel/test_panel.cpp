@@ -50,10 +50,13 @@ TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; cho
   r.toBoundary();
   auto press = [&](Button b, int i = 0, bool shift = false) { r.apply(Command::press(b, i, shift)); };
   const Patch& e = r.st().edit;
+  // no RANGE control in 60 mode (C-2): a RANGE press changes nothing and no RANGE LED is lit
+  REQUIRE(e.v[W_RANGE] == 1);
   press(Button::Range, 0);
-  CHECK(e.v[W_RANGE] == 0);
   press(Button::Range, 2);
-  CHECK(e.v[W_RANGE] == 2);
+  CHECK(e.v[W_RANGE] == 1);
+  r.skip(64);
+  for (int i = 0; i < 3; ++i) CHECK_FALSE(snap(r).buttonLeds & (1ull << (L_RANGE16 + i)));
   press(Button::Pulse);
   CHECK(e.v[W_PULSE] == 1);
   press(Button::Pulse);

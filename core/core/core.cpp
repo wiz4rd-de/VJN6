@@ -251,8 +251,8 @@ void Core::handleCommand(const Command& c) {
       const Patch& e = st_.edit;
       auto eff = [&](int f) { return sysex::eff(e, f); };
       switch (bt) {
-        case Button::Range:
-          if (idx <= 2) setField(W_RANGE, idx, o, panel);
+        case Button::Range:  // 106 mode only (the Juno-60 has no RANGE control, §5.2)
+          if (is106 && idx <= 2) setField(W_RANGE, idx, o, panel);
           return;
         case Button::Pulse: setField(W_PULSE, eff(W_PULSE) ? 0 : 1, o, panel); return;
         case Button::Saw: setField(W_SAW, eff(W_SAW) ? 0 : 1, o, panel); return;
@@ -1255,7 +1255,7 @@ uint64_t Core::buttonLeds(uint64_t* blink) const {
   const bool is106 = m == Mode::J106;
   const Patch& e = st_.edit;
   auto eff = [&](int f) { return sysex::eff(e, f); };
-  set(L_RANGE16 + eff(W_RANGE));
+  if (is106) set(L_RANGE16 + eff(W_RANGE));  // RANGE exists in 106 mode only (§5.2)
   if (eff(W_PULSE)) set(L_PULSE);
   if (eff(W_SAW)) set(L_SAW);
   int ch = eff(W_CHORUS);

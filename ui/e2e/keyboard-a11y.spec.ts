@@ -113,7 +113,7 @@ const ORDER: Record<'60' | '106', string[]> = {
   '60': [
     'volume', 'oct-transpose', 'lfo-trig', 'bend-dco', 'bend-vcf', 'lever',
     'lfo-rate', 'lfo-delay', 'lfo-mode',
-    'dco-lfo', 'dco-pwm', 'pwm-mode', 'range-16', 'range-8', 'range-4', 'pulse', 'saw', 'sub', 'sub-level', 'noise',
+    'dco-lfo', 'dco-pwm', 'pwm-mode', 'pulse', 'saw', 'sub', 'sub-level', 'noise', // no RANGE in 60 mode (C-2)
     'hpf',
     'vcf-freq', 'vcf-res', 'vcf-env', 'vcf-lfo', 'vcf-kybd', 'vcf-pol',
     'vca-mode', 'vca-level',

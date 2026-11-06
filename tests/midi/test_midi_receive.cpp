@@ -112,8 +112,8 @@ TEST_CASE("AC-M1.2 CC20 64 -> HPF 2, CC93 50 -> I, CC93 100 -> I+II (shown as I 
       settle(r);
       CHECK(r.st().edit.v[W_HPF] == 2);
       CHECK(r.st().edit.v[W_CHORUS] == 1);
-      CHECK(r.st().edit.v[W_RANGE] == 2);  // 4'
-      CHECK(lit(r, L_RANGE4));
+      CHECK(r.st().edit.v[W_RANGE] == 2);  // 4', stored in both modes
+      CHECK(lit(r, L_RANGE4) == is106);      // 60 mode has no RANGE LED (v3.2 C-2)
       r.cc(93, 100);
       settle(r);
       CHECK(r.st().edit.v[W_CHORUS] == 3);  // stored in both modes

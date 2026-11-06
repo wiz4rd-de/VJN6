@@ -203,6 +203,7 @@ TEST_CASE("AC-E2.2 noise source RMS, flat at the VCF input, identical in all voi
   }
 }
 
+// 60 mode has no RANGE (C-2): every W0 plays the 8' pitch; 106 mode follows W0.
 TEST_CASE("AC-E3.1 DCO pitch per range and note", "[engine][E3]") {
   for (Mode m : {Mode::J60, Mode::J106}) {
     for (int range = 0; range < 3; ++range) {
@@ -220,7 +221,7 @@ TEST_CASE("AC-E3.1 DCO pitch per range and note", "[engine][E3]") {
         REQUIRE(t.size() > 20);
         const double fo = fs * r.eng().oversample();
         const double f = fo * (t.size() - 1) / (t.back() - t.front());
-        const double rangeC = range == 0 ? -1200.0 : range == 2 ? 1200.0 : 0.0;
+        const double rangeC = m == Mode::J60 ? 0.0 : range == 0 ? -1200.0 : range == 2 ? 1200.0 : 0.0;
         double expect = 440.0 * std::pow(2.0, (note - 69) / 12.0 + rangeC / 1200.0);
         double tol = 0.5;
         if (m == Mode::J106) {

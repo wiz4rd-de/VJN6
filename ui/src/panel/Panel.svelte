@@ -79,6 +79,7 @@
     {:else}
       <div
         class="group"
+        data-testid="text-{t.id}"
         class:center={t.align === 'center'}
         style="left:{t.align === 'center' ? t.x - 50 : t.x}px; top:{t.y}px"
         aria-hidden="true"

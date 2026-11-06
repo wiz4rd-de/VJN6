@@ -308,6 +308,7 @@ export function switchCount(field: number): number {
 export function effectiveSwitch(field: number, stored: number, is106: boolean): number {
   let v = stored;
   if (v >= switchCount(field)) v = 0;
+  if (!is106 && field === Field.RANGE) return 1; // no RANGE in 60 mode: read as 8′ (C-2, §4.1)
   if (is106) {
     if (field === Field.SUB) return 1;
     if (field === Field.CHORUS && v === 3) return 1;

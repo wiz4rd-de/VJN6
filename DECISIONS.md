@@ -250,3 +250,35 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   (Safari has no Web MIDI). Drops of several files use a synthetic DataTransfer; "Cancel" is a file chooser
   closed with no files; "IndexedDB disabled" hides `window.indexedDB`.
 - **Lever rounding**: ±30 px gives −4095 / +4096 (Math.round of ±4095.5); both are +-0.5 of the lever range.
+
+## v3.2 — Juno-60 corrections (VJN6-J60-CORRECTIONS-KICKOFF.md)
+
+Guardrail for every item: 106 mode unchanged. The regression guard is the baseline recorded from 209a8ab
+before any change (native 123 test cases / 33 810 assertions, plugin 27 / 11 079, WASM identical, Vitest 54,
+Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, the 106 rows of
+`tests/golden/display_table.json`, the 106 screenshots).
+
+### C-2 No RANGE in 60 mode
+- **Where W0 is ignored:** `Engine::sw(W_RANGE)` returns 1 in 60 mode, so both 60-mode pitch paths (control
+  step and note-on) get range = 0 cents from one place; the stored byte is untouched (§4.1). A RANGE press
+  (`Button::Range`) is ignored in 60 mode, and the RANGE LEDs are lit in 106 mode only (§5.2). CC12 and
+  host writes of `s_range` still store W0 in 60 mode (R-M1, §4.8).
+- **LED matrix (AC-P4.1):** every row that ends in 60 mode loses `R8`, including the two rows that start in
+  106 mode and switch to 60 (`106 -> 60 …`), because their expectation is a 60-mode state. The 60 rows that
+  pressed RANGE now check that the press changes nothing. The old 60 row "stored range 5 is read as 16′"
+  cannot show anything in 60 mode any more; its out-of-range coverage moved to a new 106 row with the same
+  steps (an added row; no existing 106 row changed). AC-M1.2 likewise checks the RANGE 4′ LED after CC12 100
+  in 106 mode only; in 60 mode it checks the stored W0 = 2 and that no RANGE LED is lit.
+- **Originals that change octave in 60 mode:** of the eight original patches, `BASS` (W0 = 0, 16′) now plays
+  an octave higher in 60 mode and `SFX` (W0 = 2, 4′) an octave lower; the other six are 8′. In 106 mode
+  both are unchanged. Goldens regenerated: `BASS-60-off/I/II` and `SFX-60-off/I/II`; the other 42 hashes
+  (all 24 106-mode ones included) are bit-identical.
+- **DCO gap in 60 mode left as empty panel** (§5.2): the RANGE column (x 468–494, y 116–306) is not
+  closed, because closing it would move PULSE and SAW, which 106 mode shares. PULSE, SAW, SUB, SUB LEVEL and
+  NOISE keep their positions; the `RANGE` legend is drawn in 106 mode only.
+- **UI reading of W0:** `effectiveSwitch` in `ui/src/protocol.ts` (the UI's copy of `Engine::sw`) reads W0
+  as 1 in 60 mode, for consistency; nothing in the 60 panel shows W0 and the stored value is never rewritten.
+- **Testable legends:** panel group legends carry `data-testid="text-<id>"` (an attribute only; they stay
+  `aria-hidden`), so the e2e tests can check which legends each mode draws.
+- **Screenshots:** only `panel-60-50/100/200` changed (the 960 px overlays cover the DCO box, so the 60
+  bank-manager and Settings shots did not change); every 106 PNG is byte-identical.

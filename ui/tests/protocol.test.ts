@@ -91,7 +91,10 @@ describe('slot display, LED tooltip and switch readings', () => {
     expect(effectiveSwitch(Field.CHORUS, 3, false)).toBe(3);
     expect(effectiveSwitch(Field.PWM_SRC, 2, true)).toBe(1);
     expect(effectiveSwitch(Field.SUB, 0, true)).toBe(1);
-    expect(effectiveSwitch(Field.RANGE, 9, false)).toBe(0);
+    expect(effectiveSwitch(Field.RANGE, 9, true)).toBe(0);
+    expect(effectiveSwitch(Field.RANGE, 2, true)).toBe(2);
+    // 60 mode reads W0 as 8′ whatever is stored (C-2)
+    for (const w0 of [0, 1, 2, 9]) expect(effectiveSwitch(Field.RANGE, w0, false)).toBe(1);
   });
 });
 

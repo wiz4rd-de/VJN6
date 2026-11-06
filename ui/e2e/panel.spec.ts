@@ -1,5 +1,5 @@
-// Front panel: AC-P1.1 (UI part: control map per mode, 60 chorus toggles), AC-U4.1 (combination press)
-// and AC-S3.3 (a mocked MIDI CC is visible within 100 ms).
+// Front panel: AC-P1.1 (UI part: control map per mode, no RANGE in 60 mode, 60 chorus toggles), AC-U4.1
+// (combination press) and AC-S3.3 (a mocked MIDI CC is visible within 100 ms).
 import type { Page } from '@playwright/test';
 import { ctl, expect, F, midi, openAndStart, P, setMode, state, test, waitForState, type CoreState } from './fixtures';
 
@@ -32,9 +32,6 @@ const BOTH: Record<string, Target> = {
   lever: { lever: true },
   ...Object.fromEntries(Object.entries(SLIDERS).map(([id, field]) => [id, { field }])),
   'pwm-mode': { field: F.PWM_SRC },
-  'range-16': { field: F.RANGE },
-  'range-8': { field: F.RANGE },
-  'range-4': { field: F.RANGE },
   pulse: { field: F.PULSE },
   saw: { field: F.SAW },
   hpf: { field: F.HPF },
@@ -61,9 +58,13 @@ const ONLY_60: Record<string, Target> = {
   'arp-rate': { perf: P.ARP_RATE },
 };
 
+/** RANGE is 106-only: the Juno-60 has no DCO RANGE control (C-2). */
 const ONLY_106: Record<string, Target> = {
   'lfo-trig-sens': { perf: P.LFO_TRIG_SENS },
   'porta-time': { perf: P.PORTA_TIME },
+  'range-16': { field: F.RANGE },
+  'range-8': { field: F.RANGE },
+  'range-4': { field: F.RANGE },
   'chorus-off': { field: F.CHORUS },
   'group-a': { button: true },
   'group-b': { button: true },
@@ -140,12 +141,12 @@ async function pressButtons(page: Page, mode: '60' | '106'): Promise<void> {
     await waitForState(page, (s) => read(s, t) === 1 - before, `${id} toggles`);
     await expect(ctl(page, id)).toHaveAttribute('data-lit', String(before === 0));
   }
-  for (const [i, id] of ['range-16', 'range-8', 'range-4'].entries()) {
-    await ctl(page, id).click();
-    await waitForState(page, (s) => s.edit[F.RANGE] === i, `${id} → W0 = ${i}`);
-    await expect(ctl(page, id)).toHaveAttribute('data-lit', 'true');
-  }
   if (mode === '106') {
+    for (const [i, id] of ['range-16', 'range-8', 'range-4'].entries()) {
+      await ctl(page, id).click();
+      await waitForState(page, (s) => s.edit[F.RANGE] === i, `${id} → W0 = ${i}`);
+      await expect(ctl(page, id)).toHaveAttribute('data-lit', 'true');
+    }
     for (const [id, w4] of [['chorus-ii', 2], ['chorus-i', 1], ['chorus-off', 0]] as const) {
       await ctl(page, id).click();
       await waitForState(page, (s) => s.edit[F.CHORUS] === w4, `${id} → W4 = ${w4}`);
@@ -211,7 +212,9 @@ test.describe('AC-P1.1 control map (UI part)', () => {
         await expect(ctl(page, 'hpf-pos-3')).toHaveCount(1);
         await expect(ctl(page, 'pwm-mode-pos-2')).toHaveText('ENV');
         await expect(ctl(page, 'vcf-pol-pos-1')).toHaveText('−');
+        await expect(page.getByTestId('text-range'), 'no RANGE legend in the DCO box (C-2)').toHaveCount(0);
       } else {
+        await expect(page.getByTestId('text-range')).toHaveText('RANGE');
         await expect(ctl(page, 'hpf')).not.toHaveAttribute('data-field', /.*/); // 4-position slider
         await expect(ctl(page, 'hpf')).toHaveAttribute('aria-valuemax', '3');
         await expect(ctl(page, 'pwm-mode-pos-2')).toHaveCount(0);
@@ -223,6 +226,40 @@ test.describe('AC-P1.1 control map (UI part)', () => {
       await pressButtons(page, mode);
     });
   }
+
+  test('AC-P1.1 60 mode: no RANGE control, its place stays empty, PULSE and SAW do not move, a stored 16′ is kept for 106 mode (C-2, §8)', async ({
+    page,
+  }) => {
+    await openAndStart(page);
+    await setMode(page, '106');
+    await ctl(page, 'range-16').click();
+    await waitForState(page, (s) => s.edit[F.RANGE] === 0, 'RANGE 16′ → W0 = 0');
+    await expect(ctl(page, 'range-16')).toHaveAttribute('data-lit', 'true');
+    const boxes = async () => Promise.all(['pulse', 'saw'].map((id) => ctl(page, id).boundingBox()));
+    const shared106 = await boxes();
+    const rangeBoxes = await Promise.all(['range-16', 'range-8', 'range-4'].map((id) => ctl(page, id).boundingBox()));
+
+    await setMode(page, '60');
+    for (const id of ['range-16', 'range-8', 'range-4']) await expect(ctl(page, id)).toHaveCount(0);
+    await expect(page.getByTestId('text-range')).toHaveCount(0);
+    expect(await boxes(), 'PULSE and SAW keep their 106 positions').toEqual(shared106);
+    // the RANGE place is empty panel: no control under the former button centres
+    for (const b of rangeBoxes) {
+      const hit = await page.evaluate(
+        ({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-testid^="ctl-"]')?.getAttribute('data-testid') ?? null,
+        { x: b!.x + b!.width / 2, y: b!.y + b!.height / 2 },
+      );
+      expect(hit, 'nothing is drawn where RANGE sits in 106 mode').toBeNull();
+    }
+    const s60 = await state(page);
+    expect(s60.edit[F.RANGE], 'the stored W0 is kept (lossless)').toBe(0);
+    // ButtonLed bits L_RANGE16, L_RANGE8, L_RANGE4
+    for (const bit of [0, 1, 2]) expect(s60.lit, 'no RANGE LED in 60 mode').not.toContain(bit);
+
+    await setMode(page, '106');
+    await expect(ctl(page, 'range-16')).toHaveAttribute('data-lit', 'true');
+    expect((await state(page)).edit[F.RANGE]).toBe(0);
+  });
 
   test('AC-P1.1 60 mode: the chorus I and II buttons toggle off / I / II / I+II', async ({ page }) => {
     await openAndStart(page);
