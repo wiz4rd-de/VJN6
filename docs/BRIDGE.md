@@ -28,6 +28,7 @@ All numbers are integers. Field, perf and setting ids are the enums of `core/inc
 | `note` | `n`, `vel` | Computer-keyboard note; `vel` 0 = note off. |
 | `pedal` | `on` | Space (hold pedal). |
 | `midiIn` | `port` 0–15, `bytes` | One complete MIDI message ≤ 24 bytes from a Web MIDI input (web only; ports from 1). |
+| `midiInputGone` | `port` | A Web MIDI input vanished or was disabled: acts as CC123 for that input's notes and clears the HOLD set and arpeggio (R-M1). |
 | `selectSlot` | `slot` 1–128 | Bank-manager double-click (F-4, transmits in 106 mode). |
 | `rename` | `slot`, `name` | Bank-manager rename (normalised by the core, §4.3; refused with `Pr` under protect). |
 | `copySlot` | `from`, `to` | Row drop onto a row. |
@@ -39,19 +40,20 @@ All numbers are integers. Field, perf and setting ids are the enums of `core/inc
 | `export` | `what` | `bankJson`, `bankSyx`, `patchJson`, `patchSyx`. Web: answered with `exportData`. Desktop: handled by the host (native save dialog). |
 
 Host-only messages (not core; desktop host or web glue handles them): `openFile` (desktop native open
-dialog), `openDevices` (standalone JUCE device selector), `midiOutput` (`name`: chosen output or `""`),
-`gesture` (`f`/`p`, `begin`: host automation gesture, plugin), `zoom`.
+dialog), `openDevices` (standalone JUCE device selector), `midiOutput` (`name`: the chosen output's `id`
+from `env.outputs`, `""` = none), `gesture` (`f` field or `p` perf, `begin` true/false: host automation
+gesture, plugin; ignored on the web), `zoom` (`v`: 0 = Fit or 50…200).
 
 ## Core → UI messages
 
 | `t` | Fields |
 | --- | --- |
 | `state` | `seq`, `mode` (0/1), `edit` [25], `name`, `stored` [25], `edited`, `manual`, `slot` 1–128, `pendingBank` 1–8, `pendingGroup` 0/1, `perf` [20], `settings` [8], `led` {`text` 2 chars, `dp`, `blink`, `message` 0–5}, `lit` [bit indices], `blinking` [bit indices], `writeArmed`, `ktArmed`, `lfoTrig`, `push`, `lever` (−8191…8191), `latency`, `bankVersion`, `bank`? [128 × {`n` name, `p` [25]}] (present on `ready` and whenever the bank changed). |
-| `notice` | `kind` ∈ `loaded`, `bankLoaded`, `imported` (`i` written, `j` dropped), `protected`, `malformed`, `unreadable`; `file` (name of the last loaded file) |
+| `notice` | `kind` ∈ `loaded`, `bankLoaded`, `imported` (`i` written, `j` dropped), `protected`, `malformed`, `unreadable`, `writeFailed` (desktop export: `file` is the path); `file` (name of the last loaded file) |
 | `exportData` | `what`, `name` (export file name, §4.6), `b64` |
 | `midiOut` | `bytes` (web only: send through the chosen Web MIDI output) |
 | `status` | `text` (Settings status line, e.g. "Could not save state: …") |
-| `env` | host description sent once after `ready`: `build` (`plugin`/`standalone`/`web`), `midiOutAvailable`, `sysexPermitted`, `midiAvailable`, `inputs` [{`id`,`name`,`enabled`}], `outputs` [{`id`,`name`}], `output` (selected id or ""), `saveError` ("" or text) |
+| `env` | host description sent after `ready` and again whenever MIDI availability or the device lists change: `build` (`plugin`/`standalone`/`web`), `midiOutAvailable`, `sysexPermitted`, `midiAvailable`, `inputs` [{`id`,`name`,`enabled`}], `outputs` [{`id`,`name`}], `output` (selected id or ""), `saveError` ("" or text) |
 
 LED characters: `0`–`9`, `P`, `r`, `E`, `o`, `k`, `c`, `t`, `-`, space (blank). Button LED bit indices
 are the `ButtonLed` enum of `core/include/vjn6/instrument.h`:
@@ -61,7 +63,7 @@ are the `ButtonLed` enum of `core/include/vjn6/instrument.h`:
 
 ## Web module API (`ui/public/vjn6.js`, Emscripten `MODULARIZE`, `EXPORT_NAME=createVjn6`)
 
-Built with `-sAUDIO_WORKLET -sWASM_WORKERS` (§15.2). Exported C functions (call with `ccall`/`cwrap`;
+Built with `-sAUDIO_WORKLET -sWASM_WORKERS` (§15.2; emcc 6 names the environment `web,worker,worklet`). Exported C functions (call with `ccall`/`cwrap`;
 strings are UTF-8, byte buffers via `_malloc`/`HEAPU8`):
 
 | Function | Thread | Purpose |
@@ -71,7 +73,7 @@ strings are UTF-8, byte buffers via `_malloc`/`HEAPU8`):
 | `int vjn6_save_state(void)` | main | Serialises state; returns length; bytes at `vjn6_state_ptr()`. |
 | `uint8_t* vjn6_state_ptr(void)` | main | |
 | `void vjn6_command(const char* json)` | main | One UI → core message (`Bridge::handleUiMessage`). |
-| `const char* vjn6_poll(void)` | main | JSON array of core → UI messages (call from `requestAnimationFrame`, ≤ 60 Hz). |
+| `const char* vjn6_poll(void)` | main | JSON array of core → UI message objects (call from `requestAnimationFrame`, ≤ 60 Hz). |
 | `void vjn6_load_file(const char* name, uint8_t* data, int len)` | main | File bytes (notices come back through `vjn6_poll`). |
 | `int vjn6_start_audio(void)` | main | Called on the first user gesture: creates/resumes the Wasm audio worklet node on the context. Returns 0 on failure ("No audio output available."). |
 | `int vjn6_audio_context(void)` | main | Emscripten audio-context handle; JS gets the `AudioContext` with `emscriptenGetAudioObject(handle)` (also used for the test-only `AnalyserNode` tap). |

@@ -130,3 +130,61 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   `workflow_dispatch` only; after a merge to `main` a smoke-only job runs. No workflow triggers on pushes
   to development branches or on PRs into `develop/**` / `epic/**`. Per-slice verification uses the local
   gates. This narrows §15.1 ("CI runs every §13 criterion") to the PR-into-main run.
+
+## UI (Svelte)
+
+- **ARIA names / tooltip legends** use the panel legend prefixed by its section where the short legend
+  repeats ("LFO RATE", "VCF FREQ", "ENV A", "BENDER DCO", "RANGE 16′", "GROUP A"); the panel shows the
+  short legend under the section header (R-U3, R-P5).
+- **Switch order**: named positions top to bottom in the spec's order (AUTO/MAN, LFO/MAN/ENV, +/−, ENV/GATE,
+  UP/U&D/DOWN); graded positions put the highest at the top (HPF 3…0 per §5.2, OCTAVE H/N/L, ARP RANGE 3/2/1);
+  Up moves to the position visually above.
+- **Drag/wheel** (R-U1): distances and the lever's ±60 px are logical canvas px (screen px ÷ scale); one
+  wheel event is one step whatever its delta; the 106 HPF slider snaps one position per (300 − 14)/3 px.
+- **Typed entry** commits on blur (like the bank-manager rename).
+- **Tooltips**: switches and buttons show their legend; the 60 HPF switch shows "HPF n = corner";
+  combination buttons name the Shift+click only in the mode where the combination exists; KEY TRANSPOSE shows
+  its value; the lever shows "BENDER v".
+- **Visuals** (§14): button LEDs use `--lamp-on` / `--led-off`; section titles CONTROLLER…CHORUS; header and
+  cap colours in `ui/src/skins/skins.ts`; 12 px end cheeks; the favicon is `data:,` (no raster request).
+- **Bank manager**: the list is one Tab stop (Up/Down move, Enter selects, F2 renames); an unchanged name is
+  not sent; a `.vjn6bank` load shows "Loaded ‹file›"; the filter text is a hint line under Load file…;
+  Send patch uses `aria-disabled` with its reason as tooltip (mode/function first, then "SysEx not
+  permitted", then "MIDI output not available"). Only the first 1 MiB + 1 byte of a file is passed on
+  (enough for the size rejection); a browser read error shows `Er` and "Could not read ‹file›".
+- **Web MIDI**: one request with `{sysex: true}` (rejection = MIDI not available); ports 1…15 in first-seen
+  order (later inputs share 15); a disabled or vanished input sends `midiInputGone`; IndexedDB `devices` =
+  `{disabledInputs, output}`, new devices start enabled.
+- **Web runtime**: `vjn6_init` uses a probe AudioContext's default rate; the save scheduler follows the core
+  `seq` (F-13 timing) and uses explicit IndexedDB `commit()`; after a failed write the banner shows and
+  saving stops; polling by rAF (≤ 60 Hz), 250 ms while hidden; before the start gesture all keys are
+  swallowed and the panel is inert (the dismissing key's key-up too).
+- **Shortcuts** are ignored in text fields and on key repeat; Alt+B / Alt+, toggle their overlay.
+- **Computer keyboard**: Z, X, C, V, M and F9 ignore key repeat; key-up always releases its note even with
+  modifiers held; a play toggle applies at once and wins until the core state confirms it (≤ 1 s).
+- **Overlays** are modal (panel inert, Tab trapped, focus returns on close); Settings shows MIDI function
+  (106) in both modes; the plugin has no device section; device names longer than 40 characters are
+  shortened in the middle with the full name as tooltip.
+- **Zoom on the desktop**: the canvas always fits the window; a zoom choice is also sent to the host as
+  `zoom`, which sizes the window (§4.4).
+- **JUCE interop**: the UI implements `window.__JUCE__.backend` invocation itself instead of bundling JUCE's
+  interop JavaScript (dual-licensed JUCE EULA / AGPL; R-L1 forbids shipping AGPL).
+
+## Web build
+
+- **Environment name**: emcc 6.0.13 rejects `-sENVIRONMENT=web,worker,audioworklet` (§15.2); the same
+  environment is now called `web,worker,worklet`.
+- **`-pthread`** is added to the §15.2 flags for the core's `std::mutex` (snapshot readers) and
+  `std::this_thread::sleep_for` (`loadState`); no pthread is ever started (pool size 0).
+- **Memory**: 64 MB initial, growth to 512 MB, 4 MB main stack (ccall puts string arguments on the stack; a
+  `loadFile` message carries up to 1.4 MB of base64).
+- **Start-up**: the worklet scope is loaded in `vjn6_init` (allowed while the context is suspended); the
+  node is created and the context resumed in `vjn6_start_audio` on the gesture.
+- **Fallback driver** (web): 10 ms interval, at most 0.25 s catch-up per tick, worklet considered stalled
+  after 250 ms without a quantum (e.g. suspended context); an atomic flag guarantees one renderer at a time,
+  a worklet quantum that finds the flag taken outputs silence.
+- **WASM tests**: `-fwasm-exceptions` (Catch2 REQUIRE), `-msimd128` like the web module, NODERAWFS so the
+  goldens and fixtures are read from the repo. Results: identical to native (all 123 test cases, 33 810
+  assertions; golden hashes bit-identical).
+- **Benchmark stimulus** (§9.1): UNISON BRASS with Chorus I and one legato note change per second so all six
+  voices sound for the full 10 s.
