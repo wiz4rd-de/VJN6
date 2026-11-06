@@ -213,6 +213,10 @@ for (const mode of ['60', '106'] as const) {
     // Safari moves Tab only between text fields unless "Press Tab to highlight each item" is on;
     // Option+Tab is its key for "every control" (the same walk).
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
+    // Start the walk at the panel: a click on the left end cheek (no control there) sets the focus
+    // navigation starting point. WebKit otherwise starts after the removed start card, at the end of
+    // the document, where Tab first leaves the page.
+    await page.getByTestId('panel').click({ position: { x: 5, y: 5 } });
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     // the first Tab may stop on the document first (Chromium continues from the removed start card)
     let first: Focused | null = null;
@@ -241,10 +245,16 @@ for (const mode of ['60', '106'] as const) {
     for (const f of seen) {
       expect(f.ring, `focus ring of ${f.id}`).toEqual({ style: 'solid', width: '2px', color: 'rgb(236, 232, 220)', visible: true });
     }
-    // after the last control Tab leaves the panel
+    // after the right edge: the top strip's BANKS and SETTINGS buttons (DECISIONS.md), then Tab leaves the panel
+    for (const nav of ['nav-bank', 'nav-settings']) {
+      await page.keyboard.press(tab);
+      await expect(page.getByTestId(nav), `Tab after the right edge reaches ${nav}`).toBeFocused();
+      await expect(page.getByTestId(nav)).toHaveCSS('outline-width', '2px');
+    }
     await page.keyboard.press(tab);
     const next = await focusedInfo(page);
-    expect(next?.id ?? null, 'nothing after the right edge').toBeNull();
+    expect(next?.id ?? null, 'no panel control after the top strip').toBeNull();
+    await expect(page.getByTestId('nav-settings')).not.toBeFocused();
 
     // ARIA names equal the legends (spot checks) and axe-core finds no missing names
     await expect(ctl(page, 'vcf-freq')).toHaveAccessibleName('VCF FREQ');

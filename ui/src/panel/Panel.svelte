@@ -5,6 +5,7 @@
   import { headerText, skinFor } from '../skins/skins';
   import Knob from './Knob.svelte';
   import { BOXES, CANVAS_H, CANVAS_W, CONTROLS, HEADER_H, inMode, TEXTS } from './layout';
+  import HeaderButtons from './HeaderButtons.svelte';
   import Lever from './Lever.svelte';
   import PanelButton from './PanelButton.svelte';
   import Slider from './Slider.svelte';
@@ -103,6 +104,7 @@
       <LedDisplay x={c.x} y={c.y} />
     {/if}
   {/each}
+  <HeaderButtons />
 </div>
 
 <style>

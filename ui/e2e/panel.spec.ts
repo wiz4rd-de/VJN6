@@ -329,3 +329,31 @@ test('AC-S3.3 web with mocked MIDI: CC74 64 injected → the FREQ slider shows 5
   expect(s.edited).toBe(true); // an external change sets EDITED (R-S2) …
   expect(s.slot).toBe(1); // … and never changes the slot
 });
+
+test('Top strip: SETTINGS and BANKS open their overlays by click; the mode is switched 60 → 106 → 60 with the mouse only', async ({
+  page,
+}) => {
+  await openAndStart(page);
+  const panel = page.getByTestId('panel');
+  await expect(panel).toHaveAttribute('data-mode', '60');
+  for (const mode of ['106', '60'] as const) {
+    await page.getByTestId('nav-settings').click();
+    const dlg = page.getByTestId('settings');
+    await expect(dlg).toBeVisible();
+    await dlg.getByTestId(`set-mode-${mode}`).click();
+    await waitForState(page, (s: CoreState) => s.mode === (mode === '106' ? 1 : 0));
+    await page.getByTestId('overlay-backdrop').click({ position: { x: 5, y: 5 } });
+    await expect(dlg).toHaveCount(0);
+    await expect(panel).toHaveAttribute('data-mode', mode);
+    await expect(page.getByTestId('mode-badge')).toHaveText(mode);
+    // drawn in both modes
+    await expect(page.getByTestId('nav-settings')).toBeVisible();
+    await expect(page.getByTestId('nav-bank')).toBeVisible();
+  }
+  await page.getByTestId('nav-bank').click();
+  await expect(page.getByTestId('bank-manager')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('bank-manager')).toHaveCount(0);
+  await expect(page.getByTestId('nav-settings')).toHaveAccessibleName('SETTINGS');
+  await expect(page.getByTestId('nav-bank')).toHaveAccessibleName('BANKS');
+});

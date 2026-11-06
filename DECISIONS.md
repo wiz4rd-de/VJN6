@@ -160,6 +160,13 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   saving stops; polling by rAF (≤ 60 Hz), 250 ms while hidden; before the start gesture all keys are
   swallowed and the panel is inert (the dismissing key's key-up too).
 - **Shortcuts** are ignored in text fields and on key repeat; Alt+B / Alt+, toggle their overlay.
+- **BANKS and SETTINGS buttons** (2026-11-06): §5 gives the overlays no on-panel control, so the bank
+  manager and Settings (with the 60/106 mode choice, F-12) could only be opened with Alt+B / Alt+, and the
+  mode could not be found by clicking (reported on the standalone). Two outlined text buttons sit in the
+  top strip above the y = 40 rule, right-aligned to the right edge box (BANKS 1232–1292, SETTINGS
+  1300–1380, y 10–32), drawn in both modes; the tooltip names the shortcut (⌥B / ⌥, on macOS, Alt+B /
+  Alt+, elsewhere). They come after the right edge in the Tab order, so the R-U3 panel order is
+  unchanged. The AC-SC1 baselines were regenerated for them.
 - **Computer keyboard**: Z, X, C, V, M and F9 ignore key repeat; key-up always releases its note even with
   modifiers held; a play toggle applies at once and wins until the core state confirms it (≤ 1 s).
 - **Overlays** are modal (panel inert, Tab trapped, focus returns on close); Settings shows MIDI function
