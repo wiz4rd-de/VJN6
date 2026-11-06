@@ -168,7 +168,7 @@ class AppModel {
       switch (m.t) {
         case 'state': {
           if (m.bank) this.bank = m.bank;
-          this.core = m;
+          this.core = this.withPending(m);
           this.keyboard.setPlayFromState((m.settings?.[Setting.KBD_PLAY] ?? 1) !== 0);
           this.updateBlink();
           break;
@@ -201,12 +201,50 @@ class AppModel {
 
   // ---- panel actions ----
 
+  // Values sent but not yet reported back by the core. Until the core's state shows them (or for at most
+  // 250 ms), the panel shows and steps from these, so fast key repeats, wheel ticks and drags never step
+  // from a stale value (the core reports state at up to 60 Hz).
+  private pendingFields = new Map<number, { v: number; t: number }>();
+  private pendingPerf = new Map<number, { v: number; t: number }>();
+
+  private withPending(m: CoreState): CoreState {
+    if (this.pendingFields.size === 0 && this.pendingPerf.size === 0) return m;
+    const now = performance.now();
+    let edit = m.edit;
+    let perf = m.perf;
+    for (const [f, p] of this.pendingFields) {
+      if (m.edit[f] === p.v || now - p.t > 250) {
+        this.pendingFields.delete(f);
+      } else {
+        if (edit === m.edit) edit = [...m.edit];
+        edit[f] = p.v;
+      }
+    }
+    for (const [i, p] of this.pendingPerf) {
+      if (m.perf[i] === p.v || now - p.t > 250) {
+        this.pendingPerf.delete(i);
+      } else {
+        if (perf === m.perf) perf = [...m.perf];
+        perf[i] = p.v;
+      }
+    }
+    return edit === m.edit && perf === m.perf ? m : { ...m, edit, perf };
+  }
+
   setField(f: number, v: number): void {
     this.send({ t: 'field', f, v });
+    if (this.core) {
+      this.pendingFields.set(f, { v, t: performance.now() });
+      this.core = this.withPending(this.core);
+    }
   }
 
   setPerf(p: number, v: number, src: Src = 'panel'): void {
     this.send(src === 'panel' ? { t: 'perf', p, v } : { t: 'perf', p, v, src });
+    if (this.core) {
+      this.pendingPerf.set(p, { v, t: performance.now() });
+      this.core = this.withPending(this.core);
+    }
   }
 
   setSetting(s: number, v: number): void {
