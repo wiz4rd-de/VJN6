@@ -231,3 +231,250 @@ walkthrough was then run headless.
   - Signed and notarised installers.
   - Public web hosting with COOP/COEP.
   - A trade-dress and name check, including replacing `com.marcofunk.vjn6` with an owned reverse domain.
+
+## v3.2 — Juno-60 corrections (VJN6-J60-CORRECTIONS-KICKOFF.md)
+
+Branch `develop/j60-corrections`, from `develop/vjn6` at 209a8ab. One commit per item:
+
+| Commit | Item |
+| --- | --- |
+| 7ecd4ec | SPEC.md v3.2 (changelog C-1 … C-8), the kickoff, the PLAN.md v3.2 section |
+| 7d82945 | C-2: no RANGE in 60 mode |
+| 02b4d7a | C-3: octave transpose D/N/U |
+| e973331 | C-4: centre-zero 60 VCA LEVEL |
+| 0ea98a1 | C-5: 60 VCF order |
+| f93685d | C-6: 60 chorus OFF/I/II and I+II |
+| faba260 | C-7: the factory bank, with the C-8 test changes it causes |
+
+The C-8 test changes of C-2 … C-6 are in each item's own commit. Every commit was made with the full local
+gate set green. Nothing was pushed and no PR was opened, so CI has not run (owner rule).
+
+Only 60 mode changed. 106 mode matches the baseline recorded from 209a8ab before any change, apart from the
+default-bank exceptions of C-8 (below).
+
+### What changed, per C item
+
+- **C-1 Square wave (SPEC only):** R-E3 now says there is no separate square control. A square is the pulse
+  at PWM 0 (MANUAL), and the sub is a square one octave down. The engine already worked this way, so no code
+  changed.
+- **C-2 No RANGE in 60 mode:**
+  - `Engine::sw` reads W0 as 1 (8′) in 60 mode. The stored byte is kept, and CC12 and host writes still
+    store it.
+  - A RANGE press is ignored in 60 mode, and the RANGE LEDs, buttons and legend exist in 106 mode only.
+  - The empty DCO column stays empty, so no 106 position moves.
+- **C-3 Octave transpose D/N/U:**
+  - The host strings of `f_oct_transpose` are `D`, `N`, `U`. The panel labels read U, N, D from top to
+    bottom.
+  - The values (0 = D −12, 1 = N, 2 = U +12) and the default are unchanged, so saved state stays
+    compatible.
+- **C-4 60 VCA LEVEL −5…+5:**
+  - The panel, tooltip, host string and typed entry show v = byte/12.7 − 5.
+  - Typed entry commits floor((v + 5) × 12.7 + 0.5) after clamping v to −5…+5.
+  - A value that rounds to zero shows `0.0`; every other value carries `+` or `−`.
+  - One core rule (`display::fieldV`, `fieldByteFromV`, the mode-aware `hostValueString` and
+    `hostValueFromString`) feeds the display table, the plugin and, mirrored in `format.ts`, the UI.
+  - The plugin's value strings follow the active mode: an atomic holds the mode, and a mode change calls
+    `updateHostDisplay` with parameter info changed.
+  - The byte, the R-E6 gain law and the dB in the tooltip are unchanged.
+- **C-5 60 VCF order:**
+  - The 60 panel and Tab order are FREQ, RES, polarity, ENV, LFO, KYBD.
+  - SPEC §5.2 now names the VCF box as the one exception to "shared controls keep their position".
+  - FREQ and RES do not move. 106 mode is unchanged.
+- **C-6 60 chorus OFF / I / II:**
+  - The three are radio buttons in 60 mode; OFF has no LED.
+  - Shift+click I while II is lit, or II while I is lit, gives I+II (W4 = 3). Repeating it does nothing, and
+    Shift without a lit partner is a plain click.
+  - The I and II tooltips name the Shift+click. 106 mode is unchanged.
+- **C-7 Factory bank:**
+  - The default bank holds the 56 Juno-60 factory patches in slots 1–56, INIT in 57 and the eight originals
+    in 58–65.
+  - `tools/make_default_bank.py` reads `banks/j60-factory-chart.csv` and writes:
+    - one source file per patch, `banks/default/001-…056-*.json`;
+    - `banks/vjn6-default.vjn6bank`;
+    - `core/state/default_bank.inc`;
+    - `docs/FACTORY_BANK.md`.
+  - `--check` verifies every generated file. The result equals the kickoff's byte table in all 56 rows.
+  - W0 encodes the chart's octave transpose (D → 16′, N → 8′, U → 4′). 60 mode ignores it (C-2), and 106 mode
+    plays each patch in its charted octave.
+  - LFO TRIG mode and octave transpose stay performance settings. They are listed per patch in the source
+    JSON and in `docs/FACTORY_BANK.md`.
+  - Existing saved states keep their own bank. The factory bank appears on first run, or by loading
+    `banks/vjn6-default.vjn6bank` with Load file….
+- **C-8 Tests:**
+  - New core tests: AC-D7.2 (slots 1–56 against a hard-coded copy of the §15.3 table, 57 INIT, 58–65
+    the v3.1 rows), AC-P5.1 (60 strings and the unchanged gain law), AC-U1.1 (core, 60 typed entry) and
+    AC-U4.1 (core, chorus combination).
+  - 60-mode expectations were changed in: AC-E3.1, AC-P1.1, AC-P4.1 (LED matrix), AC-M1.2, AC-PL2, AC-SC1
+    (60 screenshots) and the UI tests.
+  - Default-bank expectations were changed in: AC-D7.1, AC-D6.1, AC-D1.2, AC-P7.1, the AC-PL2 program
+    names and AC-SC1 (bank-manager screenshots).
+  - Tests that only relied on the v3.1 slot layout keep their assertions. They load that layout through a
+    fixture (`useV31BankLayout`, core and plugin).
+  - AC-E1.3 and the §9.1 benchmark select the originals by name, so `BRASS` is now in slot 58.
+
+### Test results (baseline 209a8ab → v3.2, final run on faba260)
+
+| Suite | Baseline | v3.2 |
+| --- | --- | --- |
+| Catch2 native (`vjn6_tests`) | 123/123, 33 810/33 810 assertions | **128/128, 40 371/40 371** |
+| Catch2 under WASM (emcc, Node) | 123/123, 33 810/33 810 | **128/128, 40 371/40 371**, identical to native |
+| Plugin tests (`vjn6_plugin_tests`, real `AudioProcessor`) | 27/27, 11 079 assertions | **27/27, 17 259/17 259** |
+| ctest (licence checks ×6, native, plugin) | 8/8 | **8/8** |
+| Generated files (`make_default_bank.py --check`, display table regenerated and diffed) | — | **up to date, identical** |
+| Vitest (UI) | 54/54 | **57/57**; `svelte-check` 0 errors, 0 warnings |
+| Playwright, macOS (Chromium + WebKit) | 81 passed, 20 skipped | **91 passed, 0 failed, 20 skipped** |
+| AC-SC1 screenshots (Linux Docker, `--check`) | 10/10 | **10/10** |
+| pluginval, strictness 5, CI flags (`--validate-in-process --timeout-ms 300000`) | — | **VST3: SUCCESS, AU: SUCCESS** |
+| Golden renders (AC-E1.3, 48 hashes) | — | 42 unchanged, including all 24 of 106 mode; 6 of 60 mode regenerated (below) |
+| Front-panel walkthrough, `npm run web` (headless Chromium, real UI) | — | **19/19 checks** |
+
+Pass rate is 100 % in every suite. Native and WASM agree on every assertion, including the golden hashes.
+
+**Benchmarks** (§9.1: 106 mode, UNISON × 6, `BRASS` from slot 58, Chorus I, 2×, 48 kHz, 10 s, median of 5,
+on an idle machine after the final commit):
+
+| Build | Real-time share | µs per 128-sample block | Gate |
+| --- | --- | --- | --- |
+| Native (Release) | **2.83 %** | 75.3 | < 8 % |
+| WASM (Node) | **3.12 %** | 83.1 | < 35 % |
+
+These numbers are about 0.3 points below the v3.1 figures (3.12 % / 3.38 %) and below a run made while the
+C-7 suite was busy (3.11 % / 3.36 %). The rendered path is unchanged (106 mode, identical golden hashes),
+so the difference is machine load.
+
+### The 106 guard (kickoff step 2)
+
+A script compared the final run with the 209a8ab baseline:
+
+- **Golden hashes:** none of the 24 106-mode hashes changed.
+- **`tests/golden/display_table.json`:** the 106-mode field rows (2 436) and knob rows (896) are identical. In
+  the 106 host rows only `f_oct_transpose` changed, which is the mode-independent C-3 label the kickoff
+  allows.
+- **Screenshots:** `panel-106-50/100/200` and `settings-106` are byte-identical to 209a8ab.
+  `bank-manager-106` changed, as allowed (names).
+- **Test names:** every baseline native, plugin and Playwright test still exists and passes. The only renamed
+  tests are the 60-mode chorus tests (AC-P1.1, native and Playwright), whose behaviour C-6 changes.
+  - No 106 assertion was changed. Only the C-8 default-bank expectations above changed.
+  - Tests that depended on the old slot numbers run on the v3.1 layout through the fixture.
+
+### Manual exercise (kickoff step 4)
+
+**`npm run web`:** the dev server was started (COOP/COEP headers), and a Playwright script drove the real
+front panel in headless Chromium with the mouse and keyboard. Headless was used because a visible tab takes
+keyboard focus. 19/19 checks passed:
+
+- **60 mode:**
+  - First run is `Strings 1` on LED `11`.
+  - No RANGE buttons or legend.
+  - D/N/U labels, and clicks set 0/2/1.
+  - VCA LEVEL:
+    - Ticks −5…+5, and hover at byte 64 shows `VCA LEVEL 0.0 = -6.0 dB`.
+    - Dragging 20 px up gives `+0.8`, and 60 px down gives `-1.5`.
+    - Typed `-2`/`+5`/`-7`/`0`/`2.5` commit 38/127/0/64/95, the field opens on `+2.5`, and `abc` and Esc
+      revert.
+  - VCF x positions and Tab order are FREQ, RES, polarity, ENV, LFO, KYBD.
+  - Chorus radio clicks work, and the I+II combination works from either side; OFF has no LED; the
+    tooltips name the Shift+click.
+  - All 56 patches 11–78 load from BANK/PATCH, banks 6 and 7 through BANK 1+5 and 2+5. Each shows the right
+    LED and name, the generator's bytes, and CLEAN.
+  - Stored 16′/4′ bytes are kept.
+  - The bank layout is 1–56 factory, 57 INIT, 58–65 originals, 66–128 INIT.
+- **106 mode** (after switching via Settings): everything as before.
+  - RANGE 16′/8′/4′ buttons write W0 and light their LEDs.
+  - There is no octave switch.
+  - VCA ticks are 0–10, typed `5` gives 64 (`5.0`), and `-2` clamps to 0.
+  - The VCF order is FREQ, RES, ENV, LFO, KYBD, polarity.
+  - Chorus OFF has its LED, and Shift+click I with II lit is a plain click.
+  - A/B, BANK and PATCH load slots 17, 14, 1, 58 and 65 with the RANGE LED of the stored W0. Bass 1 shows
+    16′ and Harpsichd 2 and SFX show 4′.
+  - Switching 106 → 60 → 106 restores the 106 panel.
+- **Script fixes:** the first pass failed 3 checks. All three were wrong expectations in the script, not app
+  defects:
+  - a wait that returned before a PATCH press on the already current slot was processed;
+  - expecting the position in a switch tooltip, where R-P5 shows the legend;
+  - expecting 8′ for slot 65, which is SFX at 4′.
+
+**Standalone:** I launched the Release app. It was built after the last core change, and no core, plugin, UI
+or web source is newer than it; the plugins pluginval tested come from the same build.
+- For a real first run, the existing files in `~/Library/Application Support/VJN6/` were moved aside and
+  restored afterwards (SHA-256 identical).
+- The app started and opened its window.
+- On quit it wrote `bank.vjn6bank` byte-identical to `banks/vjn6-default.vjn6bank`.
+- As in v3.1, the native window was not driven by hand. The window could not be captured either, because the
+  terminal has no screen-recording permission.
+- The UI it embeds is the bundle the web walkthrough exercised, and the plugin tests cover the processor and
+  editor.
+
+### Regenerated 60-mode goldens and screenshots
+
+- **`tests/golden/renders.json`:** `BASS-60-off/I/II` and `SFX-60-off/I/II` were regenerated (C-2). 60 mode
+  no longer applies their stored 16′ / 4′. The other 42 hashes are bit-identical; the bank move changed no
+  hash, because AC-E1.3 selects the originals by name.
+- **`tests/golden/display_table.json`:**
+  - the 60-mode VCA LEVEL field rows (C-4);
+  - the two `f_oct_transpose` host rows (C-3);
+  - a new `host60` section with the 60-mode host strings. It differs from `host` only in `p_vca_level`, so
+    R-P6 is checked within each mode.
+- **AC-SC1 screenshots:**
+  - `panel-60-50/100/200`: C-2 to C-6.
+  - `settings-60`: C-3 and C-6, which show dimmed behind the overlay.
+  - `bank-manager-60` and `bank-manager-106`: C-7, the new names.
+  - The panel and Settings shots are taken with INIT on slot 1, set up through the app's own bank manager.
+    Otherwise the first-run `Strings 1` would have changed every 106 panel shot, which the kickoff forbids.
+
+### Originals that change octave in 60 mode
+
+- **BASS** has W0 = 0 (16′). In 60 mode it now plays at 8′, an octave higher than in v3.1.
+- **SFX** has W0 = 2 (4′). In 60 mode it now plays at 8′, an octave lower.
+- The other six (BRASS, STRINGS, PAD, PLUCK, ORGAN, SWEEP) are 8′ and sound as before.
+- In 106 mode all eight are unchanged.
+
+### New DECISIONS.md entries (section "v3.2 — Juno-60 corrections")
+
+- **C-2:**
+  - where W0 is ignored (one place in the engine, stored byte kept);
+  - the LED-matrix rows and the new 106 out-of-range row;
+  - the octave-changing originals;
+  - the DCO gap left empty;
+  - the UI's `effectiveSwitch`;
+  - `data-testid` on legends;
+  - which screenshots changed.
+- **C-3:** labels only, values and default unchanged; switch orientation U/N/D top to bottom.
+- **C-4:**
+  - one core rule for v and typed entry;
+  - `0.0` without a sign;
+  - the `host60` section of the display table;
+  - plugin strings that follow the mode, and the short window where a host may still see the old mode's
+    strings;
+  - AC-PL2 run in both modes;
+  - the U+2212 tick labels;
+  - typed entry with ASCII signs.
+- **C-5:** the conflict with the §5.2 position rule (C-5 wins); the 60 geometry; per-mode definitions with
+  shared ids.
+- **C-6:** the core press rules; the test changes; the LED-less, `aria-pressed`-less 60 OFF button; the
+  tooltips.
+- **C-7:**
+  - the generator and its checks;
+  - W0 carrying the chart octave;
+  - octave and trig not stored;
+  - the manual full names, from a transcription and not checked against p. 24;
+  - attribution;
+  - the v3.1-layout fixture and the tests that use it;
+  - the default-bank expectations that changed;
+  - originals selected by name;
+  - AC-SC1 with INIT on slot 1;
+  - e2e silence checks with chorus noise off (`Strings 1` has chorus I, whose hiss sits at about
+    −59.7 dBFS).
+
+### New §15.4 follow-ups
+
+- **60 VCA LEVEL law:** linear `B10/127` with −5 = silent assumed (D). Measure the gain at −5, 0 and +5.
+- **LFO TRIG mode and octave transpose per patch (60):** does the Juno-60 store them in a patch? If it does,
+  move them into the patch. This affects factory patches 21, 33, 51, 52, 54 and 57, which use MANUAL trigger
+  with DCO vibrato.
+- **Factory patch 36 chorus:** chorus II is inferred, because the scan's right edge on p. 26 is cut off. It
+  needs a clean copy of p. 26, or the patch recalled on a Juno-60.
+- **Factory bank 7 tuning:** patches 71–76 and 78 sound by VCF self-oscillation, so their pitch depends on
+  each unit's filter calibration. Compare each on a Juno-60.
+- **Not a §15.4 row, but open:** the manual's full patch names in `docs/FACTORY_BANK.md` come from a
+  transcription with two evident slips corrected (58, 76). They were not checked against a scan of p. 24.
