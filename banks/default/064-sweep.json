@@ -1,5 +1,5 @@
 {
-  "slot": 8,
+  "slot": 64,
   "name": "SWEEP",
   "description": "Resonant saw with a slow LFO filter sweep.",
   "sliders": {

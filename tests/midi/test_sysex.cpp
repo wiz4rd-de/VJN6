@@ -43,6 +43,7 @@ TEST_CASE("AC-F11.1 every §4.5 message with sw1 = 0x51 / sw2 = 0x11; rc for 30/
     for (uint8_t type : {uint8_t(0x30), uint8_t(0x31)}) {
       INFO("mode " << modeName(m) << " message " << int(type));
       Rig r(48000.0, m);
+      const Slot* v31 = useV31BankLayout(r);
       r.apply(Command::setPerf(P_PROTECT, 0, Source::Overlay));
       r.toBoundary();
       r.st().edit = opposite();
@@ -63,7 +64,7 @@ TEST_CASE("AC-F11.1 every §4.5 message with sw1 = 0x51 / sw2 = 0x11; rc for 30/
         CHECK(std::string(r.st().editName.s) == "INIT");  // the edit-buffer name is kept
         CHECK(r.st().currentSlot == 1);
         CHECK(r.st().manual);
-        CHECK(r.st().bank[5].patch == defaultBank()[5].patch);  // 60 mode: a 30 message never writes a slot
+        CHECK(r.st().bank[5].patch == v31[5].patch);  // 60 mode: a 30 message never writes a slot
       }
       CHECK_FALSE(r.st().edited);
       CHECK(r.midiOut().empty());  // nothing is sent back

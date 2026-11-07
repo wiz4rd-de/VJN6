@@ -10,11 +10,13 @@ import {
   openSettings,
   P,
   peakRmsOver,
+  setChorusNoiseOff,
   setMode,
   SOUND_DB,
   startApp,
   state,
   test,
+  waitForApp,
   waitForAudio,
   waitForState,
 } from './fixtures';
@@ -162,7 +164,15 @@ test.describe('AC-F1.1 web start', () => {
   });
 
   test('AC-F1.1 web: a dismissing key is not played and not passed to the panel', async ({ page }) => {
+    // "does not sound" needs chorus noise off (slot 1 has chorus I, whose hiss is close to the threshold):
+    // the setting is saved (F-13), and a reload brings the start card back
     await openApp(page);
+    await startApp(page);
+    await setChorusNoiseOff(page);
+    await page.waitForTimeout(1500); // saved by the 1 s timer
+    await page.reload();
+    await waitForApp(page);
+    await expect(page.getByTestId('start-card')).toBeVisible();
     await page.keyboard.down('KeyA'); // C3 on the computer keyboard
     await expect(page.getByTestId('start-card')).toHaveCount(0);
     await waitForAudio(page);

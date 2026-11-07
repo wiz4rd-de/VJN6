@@ -10,6 +10,7 @@ import {
   openBankManager,
   openSettings,
   peakRmsOver,
+  setChorusNoiseOff,
   setMode,
   SOUND_DB,
   state,
@@ -40,10 +41,7 @@ async function shortcut(page: Page, code: string): Promise<void> {
 test('AC-U2.1 every R-U2 shortcut acts and no note sounds', async ({ page }) => {
   await openAndStart(page, { audio: true });
   // chorus hiss would mask "silent" on the patches with chorus: switch it off (§4.4) for this check
-  const dlg = await openSettings(page);
-  await dlg.getByTestId('set-chorus-noise-0').click();
-  await waitForState(page, (s) => s.settings[1] === 0);
-  await closeOverlay(page);
+  await setChorusNoiseOff(page);
   await waitForRms(page, 'below', SOUND_DB);
 
   // Alt+B: bank manager (toggles); Esc closes an overlay

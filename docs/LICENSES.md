@@ -74,8 +74,9 @@ Used only to build and test VJN6. None of them is linked into or shipped with a 
 | pendragon-andyh/Juno60 chorus analysis | MIT | Measurement data (chorus LFO rates and delay swing) used as numbers; attribution: Andy Harman (pendragon-andyh), "Juno60" analysis repository. No code is used. |
 | Holters & Parker, DAFx-18; Raffel & Smith, DAFx-10 | papers | Method and published constants for the BBD chorus; the implementation is original. |
 | thea.codes, "The design of the Juno DCO" | text CC-BY-SA, code Apache-2.0 | Background reading; nothing copied. The DCO is written from SPEC R-E3. |
-| Roland service notes and owner's manuals | Roland copyright | Numbers only (calibration targets, ranges, the SysEx format). No scans, images or text from them are in the repository. |
-| Roland factory patch data ("The Original 128") | Roland | **Not shipped.** VJN6 ships its own default bank (`banks/vjn6-default.vjn6bank`, generated from `banks/default/*.json`) and imports `.syx` files that the user owns. |
+| Roland service notes and owner's manuals | Roland copyright | Numbers only (calibration targets, ranges, the SysEx format), plus the Juno-60 sample-sound settings and names of the next row. No scans, images or other text from them are in the repository. |
+| Juno-60 Owner's Manual sample sounds (pp. 24–28) | Roland copyright | **Shipped as data** (SPEC R-L2, v3.2): the numeric settings of the 56 sample sounds and their patch names are slots 1–56 of the default bank (`banks/vjn6-default.vjn6bank` and the core's copy), generated from `banks/j60-factory-chart.csv` by `tools/make_default_bank.py`. Attribution, the manual's full names and notes: `docs/FACTORY_BANK.md`. The VJN6 patch names contain no Roland marks (R-L5). |
+| Juno-106 factory patch data ("The Original 128") | Roland | **Not shipped.** VJN6 imports `.syx` files that the user owns. |
 
 ## Trademarks
 

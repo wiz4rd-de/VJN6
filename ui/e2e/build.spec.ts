@@ -1,7 +1,7 @@
 // AC-B2: `npm run web` serves the page on http://localhost:5173 with COOP/COEP; after the start card,
 // a computer-keyboard note sounds (analyser RMS > −60 dBFS); in Chromium a Web MIDI note does too.
 import { ORIGIN, SPEC_ORIGIN } from './env';
-import { expect, midi, openApp, SOUND_DB, startApp, test, waitForRms } from './fixtures';
+import { expect, midi, openApp, setChorusNoiseOff, SOUND_DB, startApp, test, waitForRms } from './fixtures';
 
 test('AC-B2 served with COOP/COEP; a key and (Chromium) a mocked Web MIDI note sound after the start card', async ({
   page,
@@ -22,9 +22,11 @@ test('AC-B2 served with COOP/COEP; a key and (Chromium) a mocked Web MIDI note s
 
   await openApp(page);
   await startApp(page, { audio: true });
+  // slot 1 (`Strings 1`) has chorus I, whose hiss is close to the threshold: chorus noise off (§4.4)
+  await setChorusNoiseOff(page);
   await waitForRms(page, 'below', SOUND_DB);
 
-  // computer keyboard: A = C3 (MIDI 60) on the INIT patch of slot 1
+  // computer keyboard: A = C3 (MIDI 60) on the first-run patch, slot 1 `Strings 1` (§15.3)
   await page.keyboard.down('KeyA');
   const keyDb = await waitForRms(page, 'above', SOUND_DB);
   await page.keyboard.up('KeyA');

@@ -163,6 +163,7 @@ TEST_CASE("AC-F10.1 rename a row to e-acute + emoji + abcdefghijklm, protected /
   const char* decomposed = "e\xCC\x81\xF0\x9F\x98\x80" "abcdefghijklm";  // NFC composes e + U+0301 first
   SECTION("protected: Pr, unchanged") {
     BRig b(Mode::J60, true);
+    useV31BankLayout(b.r);
     b.ui1(std::string(R"({"t":"rename","slot":5,"name":")") + precomposed + "\"}");
     CHECK(b.notice("protected"));
     CHECK(ledText(b.r) == "Pr");
@@ -170,6 +171,7 @@ TEST_CASE("AC-F10.1 rename a row to e-acute + emoji + abcdefghijklm, protected /
   }
   SECTION("not protected: ??abcdefghij") {
     BRig b(Mode::J60);
+    useV31BankLayout(b.r);
     b.ui1(std::string(R"({"t":"rename","slot":5,"name":")") + precomposed + "\"}");
     CHECK(std::string(b.st().bank[4].name.s) == "??abcdefghij");
     b.ui1(std::string(R"({"t":"rename","slot":6,"name":")") + decomposed + "\"}");
@@ -190,6 +192,7 @@ TEST_CASE("AC-F10.1 rename a row to e-acute + emoji + abcdefghijklm, protected /
 
 TEST_CASE("AC-F10.1 row drop 2 -> 9 and a row onto the edit buffer", "[files]") {
   BRig b(Mode::J106);
+  useV31BankLayout(b.r);
   b.ui1(R"({"t":"selectSlot","slot":9})");
   b.ui1(R"({"t":"field","f":5,"v":3})");
   const Patch edit = b.st().edit, stored = b.st().stored;
@@ -217,6 +220,7 @@ TEST_CASE("AC-F10.1 row drop 2 -> 9 and a row onto the edit buffer", "[files]") 
 
 TEST_CASE("AC-F10.1 exports in both formats; a .wav is rejected with Er", "[files]") {
   BRig b(Mode::J60);
+  useV31BankLayout(b.r);
   b.ui1(R"({"t":"press","b":"patch","i":3})");
   std::string name;
   auto bank = b.exportData("bankJson", name);
@@ -409,7 +413,8 @@ TEST_CASE("AC-D4.1 .syx and file import edge cases", "[files]") {
     }
   }
   SECTION("31 messages go to free slots only; a repeated 30 target goes to the next free slot") {
-    BRig b(Mode::J60);  // default bank: slots 2-9 are not free
+    BRig b(Mode::J60);
+    useV31BankLayout(b.r);  // slots 2-9 are not free
     const auto f = concat({dumpMsg(0x31, 0, 0, syxPatch(1)), dumpMsg(0x30, 0, 0, syxPatch(2)), dumpMsg(0x30, 0, 0, syxPatch(3)),
                            dumpMsg(0x31, 0, 0, syxPatch(4))});
     b.load("mix.syx", f);

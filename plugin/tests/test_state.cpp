@@ -92,6 +92,7 @@ TEST_CASE("AC-PL3 state saved during playback restores into a new instance; rend
 
 TEST_CASE("AC-E1.4 plugin: oversampling 2x -> 4x changes the latency reported to the host", "[AC-E1.4]") {
   auto p = makeProcessor(false, 48000.0, 512);
+  useV31BankLayout(*p);
   TestHost host(*p);
   HostListener listener(*p);
   const int at2x = p->instrument().latencySamples();
@@ -110,6 +111,7 @@ TEST_CASE("AC-E1.4 plugin: oversampling 2x -> 4x changes the latency reported to
 
 TEST_CASE("AC-M1.1 plugin: channel 3 with omni off / on", "[AC-M1.1]") {
   auto p = makeProcessor();
+  useV31BankLayout(*p);
   TestHost host(*p);
   p->handleUiMessage(R"({"t":"perf","p":16,"v":3,"src":"overlay"})");
   p->handleUiMessage(R"({"t":"perf","p":17,"v":0,"src":"overlay"})");

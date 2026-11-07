@@ -111,18 +111,18 @@ test.describe('AC-F13.1 web persistence', () => {
   test('AC-F13.1 web: a slider edit and a WRITE, then a reload within 1 s → the same state returns', async ({ page }) => {
     await openAndStart(page);
     await setProtect(page, false);
-    await ctl(page, 'patch-2').click(); // BRASS
-    const brass = await waitForState(page, (s) => s.slot === 2 && s.name === 'BRASS');
+    await ctl(page, 'patch-2').click(); // `Strings 2`
+    const loaded = await waitForState(page, (s) => s.slot === 2 && s.name === 'Strings 2');
     await typeInto(page, 'vcf-freq', '5');
     await waitForState(page, (s) => s.edit[F.VCF_FREQ] === 64 && s.edited);
-    expect(brass.edit[F.VCF_FREQ]).not.toBe(64);
+    expect(loaded.edit[F.VCF_FREQ]).not.toBe(64);
     await ctl(page, 'write').click();
     await ctl(page, 'patch-5').click();
     const written = await waitForState(page, (s) => s.slot === 5 && !s.writeArmed && !s.edited);
     const t0 = Date.now();
     await expect(page.getByTestId('led')).toHaveAttribute('data-raw-text', 'ok');
     const bankBefore = await bank(page);
-    expect(bankBefore[4]).toEqual({ n: 'BRASS', p: written.edit });
+    expect(bankBefore[4]).toEqual({ n: 'Strings 2', p: written.edit });
 
     await page.reload();
     const reloadedAfter = Date.now() - t0;
@@ -132,12 +132,12 @@ test.describe('AC-F13.1 web persistence', () => {
     expect(s.slot).toBe(5);
     expect(s.edit).toEqual(written.edit);
     expect(s.edit[F.VCF_FREQ]).toBe(64);
-    expect(s.name).toBe('BRASS');
+    expect(s.name).toBe('Strings 2');
     expect(s.edited).toBe(false);
     expect(s.manual).toBe(false);
     expect(s.perf[P.PROTECT]).toBe(0);
     const bankAfter = await bank(page);
-    expect(bankAfter[4]).toEqual({ n: 'BRASS', p: written.edit });
+    expect(bankAfter[4]).toEqual({ n: 'Strings 2', p: written.edit });
     expect(bankAfter).toEqual(bankBefore);
     await startApp(page);
     await expect(page.getByTestId('led')).toHaveAttribute('data-text', '15');
@@ -177,7 +177,7 @@ test.describe('AC-F13.1 web persistence', () => {
       expect(slots, `after a reload ${delay} ms into the previous load, the UI shows only the saved slot`).toEqual([6]);
       const s = await state(page);
       expect(s.edit).toEqual(written.edit);
-      expect(s.name).toBe('BRASS');
+      expect(s.name).toBe('Strings 2');
     }
   });
 

@@ -1,7 +1,8 @@
 // VJN6 render benchmark (SPEC §9.1, AC-N1.1).
 //
-// 106 mode, six voices in UNISON (key mode 2, the worst case) playing the default BRASS patch (slot 2
-// of the default bank, Chorus I), 2x oversampling, 48 kHz, 10 s of audio rendered in 128-sample blocks;
+// 106 mode, six voices in UNISON (key mode 2, the worst case) playing the original BRASS patch of the
+// default bank (slot 58 since v3.2, §15.3; selected by name, since the factory `Brass` in slot 7 is a
+// different patch; Chorus I), 2x oversampling, 48 kHz, 10 s of audio rendered in 128-sample blocks;
 // the median of 5 runs is reported as % of real time and as microseconds per 128-sample block.
 // The same source runs natively and compiled with emcc under Node. Exit status 1 if the median is at
 // or above the gate for this build (native 8 %, WASM 35 %) or the instrument is not in the benchmark
@@ -27,7 +28,6 @@ constexpr double kSampleRate = 48000.0;
 constexpr int kBlock = 128;
 constexpr double kSeconds = 10.0;
 constexpr int kRuns = 5;
-constexpr int kBrassSlot = 2;
 #ifdef __EMSCRIPTEN__
 constexpr double kGatePct = 35.0;
 constexpr const char* kBuild = "wasm";
@@ -36,13 +36,23 @@ constexpr double kGatePct = 8.0;
 constexpr const char* kBuild = "native";
 #endif
 
+// The slot of the default bank's patch named exactly "BRASS" (from a fresh instrument's snapshot), 0 if none.
+int brassSlot() {
+  auto inst = std::make_unique<Instrument>(kSampleRate, kBlock);
+  auto s = std::make_unique<Snapshot>();
+  inst->snapshot(*s);
+  for (int i = 0; i < vjn6::kNumSlots; ++i)
+    if (std::strcmp(s->bank[i].name.s, "BRASS") == 0) return i + 1;
+  return 0;
+}
+
 // Puts a fresh instrument into the benchmark configuration through the public command API and
 // checks the result in the published snapshot.
-bool configure(Instrument& inst, std::vector<float>& L, std::vector<float>& R) {
+bool configure(Instrument& inst, int brass, std::vector<float>& L, std::vector<float>& R) {
   inst.post(Command::setSetting(vjn6::S_MODE, 1));
   inst.post(Command::setSetting(vjn6::S_OVERSAMPLE, 2));
   inst.post(Command::setPerf(vjn6::P_KEY_MODE, 2, Source::Overlay));
-  inst.post(Command::selectSlot(kBrassSlot, Source::Overlay));
+  inst.post(Command::selectSlot(brass, Source::Overlay));
   // 0.1 s settles the commands (they act at the first control boundary).
   for (int i = 0; i < 38; ++i) inst.render(L.data(), R.data(), kBlock);
   vjn6::Event e;
@@ -50,16 +60,16 @@ bool configure(Instrument& inst, std::vector<float>& L, std::vector<float>& R) {
   }
   auto s = std::make_unique<Snapshot>();
   inst.snapshot(*s);
-  const vjn6::Slot& brass = s->bank[kBrassSlot - 1];
+  const vjn6::Slot& slot = s->bank[brass - 1];
   const bool ok = s->settings.v[vjn6::S_MODE] == 1 && s->settings.v[vjn6::S_OVERSAMPLE] == 2 &&
-                  s->perf.v[vjn6::P_KEY_MODE] == 2 && s->currentSlot == kBrassSlot && s->edit == brass.patch &&
-                  std::strcmp(brass.name.s, "BRASS") == 0 && s->edit.v[vjn6::W_CHORUS] == 1;
+                  s->perf.v[vjn6::P_KEY_MODE] == 2 && s->currentSlot == brass && s->edit == slot.patch &&
+                  std::strcmp(slot.name.s, "BRASS") == 0 && s->edit.v[vjn6::W_CHORUS] == 1;
   if (!ok) {
     std::fprintf(stderr,
                  "benchmark configuration not reached: mode %d, oversample %d, key mode %d, slot %d, "
-                 "slot 2 name \"%s\", chorus %d\n",
+                 "slot %d name \"%s\", chorus %d\n",
                  s->settings.v[vjn6::S_MODE], s->settings.v[vjn6::S_OVERSAMPLE], s->perf.v[vjn6::P_KEY_MODE],
-                 s->currentSlot, brass.name.s, s->edit.v[vjn6::W_CHORUS]);
+                 s->currentSlot, brass, slot.name.s, s->edit.v[vjn6::W_CHORUS]);
   }
   return ok;
 }
@@ -71,10 +81,10 @@ void midi3(Instrument& inst, uint8_t status, int note, int vel) {
 
 // One run: 10 s of audio; a new note every second (legato, so all six unison voices sound throughout).
 // Returns the render time in seconds, or a negative value if the configuration failed.
-double run(double& peak) {
+double run(int brass, double& peak) {
   auto inst = std::make_unique<Instrument>(kSampleRate, kBlock);
   std::vector<float> L(kBlock), R(kBlock);
-  if (!configure(*inst, L, R)) return -1.0;
+  if (!configure(*inst, brass, L, R)) return -1.0;
 
   static const int kNotes[] = {48, 55, 52, 60, 53, 57, 50, 59, 55, 48};
   const long blocks = static_cast<long>(kSeconds * kSampleRate) / kBlock;
@@ -104,13 +114,18 @@ double run(double& peak) {
 
 int main() {
   const long blocks = static_cast<long>(kSeconds * kSampleRate) / kBlock;
+  const int brass = brassSlot();
+  if (brass == 0) {
+    std::printf("the default bank has no patch named BRASS\n");
+    return 1;
+  }
   std::printf("VJN6 benchmark (%s): 106 mode, UNISON x6, BRASS (slot %d), Chorus I, 2x oversampling, %.0f Hz, %.0f s, "
               "%d-sample blocks, median of %d runs\n",
-              kBuild, kBrassSlot, kSampleRate, kSeconds, kBlock, kRuns);
+              kBuild, brass, kSampleRate, kSeconds, kBlock, kRuns);
   std::vector<double> times;
   for (int r = 0; r < kRuns; ++r) {
     double peak = 0.0;
-    const double t = run(peak);
+    const double t = run(brass, peak);
     if (t < 0.0) {
       std::printf("run %d failed\n", r + 1);
       return 1;

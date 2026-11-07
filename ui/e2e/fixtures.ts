@@ -241,6 +241,17 @@ export async function closeOverlay(page: Page): Promise<void> {
   await expect(page.getByTestId('bank-manager')).toHaveCount(0);
 }
 
+/**
+ * Chorus noise OFF (§4.4) through the Settings overlay. "No note sounds" means RMS below SOUND_DB with chorus
+ * noise off: the hiss of a patch with chorus (slot 1, `Strings 1`, has chorus I) peaks at about −60 dBFS.
+ */
+export async function setChorusNoiseOff(page: Page): Promise<void> {
+  const dlg = await openSettings(page);
+  await dlg.getByTestId('set-chorus-noise-0').click();
+  await waitForState(page, (s) => s.settings[S.CHORUS_NOISE] === 0);
+  await closeOverlay(page);
+}
+
 /** Switches the engine mode through the Settings overlay (§5.6, F-12) and closes it. */
 export async function setMode(page: Page, mode: '60' | '106'): Promise<void> {
   await openSettings(page);

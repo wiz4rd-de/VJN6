@@ -346,3 +346,61 @@ Playwright 81 passed / 20 skipped, AC-SC1 10/10, the 24 106-mode golden hashes, 
   CHORUS II lit: I+II" and "CHORUS II — Shift+click with CHORUS I lit: I+II" (60 only, like the BANK
   combinations). Button LEDs carry `data-testid="lamp-<id>"`. Screenshots: `panel-60-*`, `settings-60`,
   `bank-manager-60` (the chorus box shows behind the overlays); every 106 PNG is byte-identical.
+
+### C-7 The Juno-60 factory bank as the default bank (and the C-8 test changes it causes)
+- **Generator** (`tools/make_default_bank.py`): reads `banks/j60-factory-chart.csv` (committed unchanged from
+  the kickoff) and writes one readable source file per factory patch, `banks/default/001-…056-*.json` (VJN6
+  name, `manual_number`, `manual_name`, the chart row as printed, `chart_performance` with octave transpose
+  and LFO trig mode, the mapped bytes), then the bank, the core's `default_bank.inc` and
+  `docs/FACTORY_BANK.md`. The originals moved by rename to `banks/default/058-…065-*.json` with only their
+  `slot` changed. Rounding is floor(x + 0.5) on exact fractions; the tool asserts that every chart value
+  round-trips byte → display → byte, that slot 57 is INIT, that the originals are slots 58–65 and that no
+  name contains a Roland or Juno mark. `--check` covers every generated file, including stale factory JSON.
+  The result equals the kickoff's byte table in all 56 rows.
+- **W0 carries the chart's octave transpose** (D → 16′, N → 8′, U → 4′): 60 mode ignores W0 (C-2), so the 60
+  sound is the chart's; 106 mode plays each patch in its intended octave. Knob positions the manual calls
+  irrelevant are kept as charted (in 106 mode, which reads W3 = 1, such patches play the sub at its level).
+- **The charts' OCTAVE TRANSPOSE and LFO TRIG MODE are not stored** (they stay §4.2 performance settings);
+  they are kept in the source JSON and listed in `docs/FACTORY_BANK.md` (§15.4 asks whether the Juno-60
+  stores them).
+- **Manual full names:** the kickoff gives only the 12-character VJN6 names (and "Pizzicato Sound 2"). The
+  full names in `manual_name` and `docs/FACTORY_BANK.md` follow the manual's list as transcribed on
+  synthmania.com ("juno 60"), which matches every VJN6 name; two evident slips there were corrected (58
+  "PMW Chorus" → "PWM Chorus"; 76, listed a second time as "Space Sound 2", → "Space Sound 3"). They were not
+  checked against a scan of p. 24; FACTORY_BANK.md says so.
+- **Attribution:** `docs/FACTORY_BANK.md` (source, transcription, mapping, per-patch performance settings,
+  the patch 36 and bank 7 notes) and a row in `docs/LICENSES.md` ("Sources of numbers"); README lists the
+  new generated files.
+- **Tests that depended on the v3.1 layout keep their assertions.** A fixture installs the v3.1 first-run
+  layout (slot 1 INIT, the originals in slots 2–9 taken by name from the shipped bank, 10–128 INIT; edit
+  buffer and stored patch of slot 1, CLEAN): `useV31BankLayout(Rig&)` in `tests/util/core_helpers.h` as a
+  real state load (so the snapshot, the bridge and exports see it) and `useV31BankLayout(VJN6AudioProcessor&)`
+  in `plugin/tests/helpers.h` through `setStateInformation`. Used by AC-F4.1, AC-F4.4 (it passed by
+  coincidence; its comments describe the v3.1 slots), AC-F5.1, AC-F5.2, AC-F10.1, AC-F11.1, AC-D4.1,
+  AC-M1.2, AC-P1.1 (60 buttons), AC-P4.1 (every row) and, in the plugin, AC-S1.1, AC-S3.1, AC-E1.4 and
+  AC-M1.1. AC-F11.1's "a 30 message never writes a slot" now compares slot 6 with the fixture's slot 6
+  (PLUCK) instead of `defaultBank()[5]`.
+- **Expectations that test the default bank or first run changed to the new bank:** AC-D7.1 (names of slots
+  1–9 and 58–65, the empty slots), AC-D6.1 and AC-D1.2 (first-run edit name `Strings 1`), AC-P7.1 (empty
+  slots 57, 66, 67, 100, 128), AC-PL2 programs (`Strings 1`, `Strings 2`). New AC-D7.2 compares slots 1–56
+  with a hard-coded copy of the factory byte table, slot 57 with INIT and slots 58–65 with the v3.1 rows
+  (from 209a8ab's `default_bank.inc`).
+- **AC-E1.3 and the benchmark select the originals by name** (`BRASS` … `SFX`; the factory `Brass` in slot 7
+  is a different patch). The 48 golden hashes did not change with the bank move. The benchmark finds
+  `BRASS` in slot 58 and prints the slot.
+- **AC-SC1 with the new bank:** first run now shows `Strings 1`, which would have changed every panel shot,
+  while the kickoff requires the 106 panel shots to stay as they were. The six panel shots and the two
+  Settings shots are therefore taken with INIT on slot 1 (`initOnSlot1` in `ui/e2e/screenshots.spec.ts`,
+  through the app's own UI: bank manager, protect off, row 57 dropped onto row 1, protect on, backdrop
+  click, Alt+1), so they show the panel layout independent of the default bank; the two bank-manager shots
+  stay on the plain first-run state (new names, `Strings 1` current). Result: `panel-106-*` and
+  `settings-106` are byte-identical to 209a8ab; `bank-manager-60/106` changed (names); `panel-60-100` differs
+  from its C-6 version in one anti-aliased pixel by one level (the 60 flow now opens and closes an overlay
+  first). The overlay is closed by a backdrop click, not Esc, because a key press turns on the keyboard
+  focus ring in the Settings shot.
+- **e2e tests with the new bank:** tests that only need "a known patch" use the new names and slots
+  (`Strings 2` in slot 2, so the export test also covers a name with a space); tests that check silence on
+  the first-run patch switch chorus noise off first (`setChorusNoiseOff`), because `Strings 1` has chorus I,
+  whose hiss (about −59.7 dBFS peak) sits on the −60 dBFS "no note" threshold (the existing rule: silence =
+  below −60 dBFS with chorus noise OFF); AC-F1.1 saves that setting and reloads to get the start card back.
+  AC-S3.3 reads the FREQ start value from the state instead of assuming INIT.

@@ -167,8 +167,8 @@ TEST_CASE("AC-PL2 128 programs named after the slots; a rename updates the progr
   REQUIRE(p->getNumPrograms() == 128);
   auto snap = snapshotOf(*p);
   for (int i = 0; i < 128; ++i) CHECK(p->getProgramName(i) == juce::String(snap->bank[i].name.s));
-  CHECK(p->getProgramName(0) == "INIT");
-  CHECK(p->getProgramName(1) == "BRASS");
+  CHECK(p->getProgramName(0) == "Strings 1");  // the v3.2 default bank (§15.3)
+  CHECK(p->getProgramName(1) == "Strings 2");
   CHECK(p->getCurrentProgram() == 0);
 
   p->handleUiMessage(R"({"t":"perf","p":19,"v":0,"src":"overlay"})");  // memory protect off

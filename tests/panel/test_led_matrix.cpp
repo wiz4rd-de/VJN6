@@ -2,8 +2,9 @@
 // (button LEDs) and §5.3 (LED states, priority: LED message -> `t-` -> WRITE blink -> slot display;
 // decimal points = EDITED except during a message; 60-mode slots 57-128 blank; Manual `--`).
 //
-// Each row starts from the first-run state (slot 1 INIT, CLEAN, pending bank 1 / group A, memory
-// protect on) in the given mode, applies its steps and expects:
+// Each row starts from the v3.1 first-run state (useV31BankLayout: slot 1 INIT, slots 2-9 the original
+// patches, CLEAN, pending bank 1 / group A, memory protect on) in the given mode, applies its steps and
+// expects:
 //   text  the two LED characters ("  " = blank), dp (decimal points), blink (digits blink), msg;
 //   lit   every lit button LED, nothing else; blnk  every blinking button LED, nothing else.
 // Button LED names: R16 R8 R4 PULSE SAW SUB CHOFF CHI CHII PORTA HOLD ARP POLY1 POLY2 A B BANK1-8
@@ -230,6 +231,7 @@ TEST_CASE("AC-P4.1 LED, decimal points and button LEDs match the hand-derived go
   for (const Row& row : kMatrix) {
     INFO("row: " << row.name << "  steps: " << row.steps);
     Rig r(48000.0, row.mode == 106 ? Mode::J106 : Mode::J60);
+    useV31BankLayout(r);
     r.toBoundary();
     std::istringstream in(row.steps);
     std::string step;

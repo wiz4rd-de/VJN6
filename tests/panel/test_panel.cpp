@@ -47,6 +47,7 @@ TEST_CASE("AC-P1.1 every patch field and performance control set from the panel 
 
 TEST_CASE("AC-P1.1 60-mode buttons; 106-only buttons are ignored in 60 mode; chorus OFF/I/II and I+II", "[panel]") {
   Rig r(48000.0, Mode::J60);
+  useV31BankLayout(r);
   r.toBoundary();
   auto press = [&](Button b, int i = 0, bool shift = false) { r.apply(Command::press(b, i, shift)); };
   const Patch& e = r.st().edit;
@@ -321,7 +322,7 @@ TEST_CASE("AC-P7.1 an empty slot of the default bank equals the R-P7 INIT patch"
   const uint8_t expect[kNumFields] = {0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 127, 0, 0, 127, 0, 0,  // B0-B15
                                       1, 0, 1, 1, 0, 0, 0, 0, 0};                           // W0-W8
   Rig r(48000.0, Mode::J60);
-  for (int slot : {1, 10, 11, 64, 65, 100, 128}) {
+  for (int slot : {57, 66, 67, 100, 128}) {  // the empty slots of §15.3 (v3.2): 57, 66-128
     INFO("slot " << slot);
     const Slot& s = r.st().bank[slot - 1];
     for (int f = 0; f < kNumFields; ++f) CHECK(s.patch.v[f] == expect[f]);

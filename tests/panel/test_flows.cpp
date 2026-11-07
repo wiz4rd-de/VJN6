@@ -52,6 +52,7 @@ TEST_CASE("AC-F4.1 PATCH 7 on an EDITED slot 3 loads slot 7 with its name, CLEAN
   for (Mode m : {Mode::J60, Mode::J106}) {
     INFO("mode " << modeName(m));
     Rig r(48000.0, m);
+    useV31BankLayout(r);
     r.apply(Command::setPerf(P_MIDI_CHANNEL, 2, Source::Overlay));
     r.toBoundary();
     editedOnSlot3(r);
@@ -127,6 +128,7 @@ TEST_CASE("AC-F4.4 a sounding voice takes slot 7's patch at the next control bou
   for (Mode m : {Mode::J60, Mode::J106}) {
     INFO("mode " << modeName(m));
     Rig r(48000.0, m);
+    useV31BankLayout(r);
     r.st().settings.v[S_VARIATION] = 0;
     r.toBoundary();
     press(r, Button::PatchBtn, 3);  // STRINGS
@@ -174,6 +176,7 @@ TEST_CASE("AC-F5.1 WRITE, PATCH 5 with protect off / on", "[panel]") {
     for (int prot : {0, 1}) {
       INFO("mode " << modeName(m) << " protect " << prot);
       Rig r(48000.0, m);
+      useV31BankLayout(r);
       r.apply(Command::setPerf(P_PROTECT, prot, Source::Overlay));
       r.toBoundary();
       press(r, Button::PatchBtn, 2);  // BRASS
@@ -212,6 +215,7 @@ TEST_CASE("AC-F5.2 WRITE armed: a note, a BANK press, a slider move, a mode swit
   for (Mode m : {Mode::J60, Mode::J106}) {
     INFO("mode " << modeName(m));
     Rig r(48000.0, m);
+    useV31BankLayout(r);
     r.toBoundary();
     press(r, Button::Write);
     // a note sounds; WRITE stays armed (MIDI and computer keyboard)

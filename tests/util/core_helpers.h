@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -128,5 +129,53 @@ inline std::vector<std::vector<uint8_t>> midiOutOf(const std::vector<Event>& ev)
 
 // A memory-protect-off rig in the given mode (file and import criteria run with protect off, §13.3).
 inline void protectOff(Rig& r) { r.apply(Command::setPerf(P_PROTECT, 0, Source::Overlay)); }
+
+// ---- v3.1 default-bank layout ----
+// v3.2 (C-7, §15.3) put the 56 Juno-60 factory patches in slots 1-56 and moved the eight original patches
+// from slots 2-9 to 58-65, so first run now starts on slot 1 `Strings 1`. The tests that call this were
+// written against the v3.1 first-run state and keep their assertions: slot 1 INIT, slots 2-9 BRASS,
+// STRINGS, PAD, BASS, PLUCK, ORGAN, SWEEP, SFX (taken by name from defaultBank(), so the shipped bytes),
+// 10-128 INIT; edit buffer, stored patch and name of slot 1, current slot 1, CLEAN, not Manual, pending
+// bank 1 / group A. It goes in as a state load applied at once, so the snapshot, the bridge and the UI see
+// it (with a new bank version); performance settings and settings stay as they are, and the load's events
+// are drained (first run has none). Call it right after constructing the rig. Returns that bank.
+inline const Slot* useV31BankLayout(Rig& r) {
+  struct V31 {
+    Slot bank[kNumSlots];
+    V31() {
+      const char* const originals[8] = {"BRASS", "STRINGS", "PAD", "BASS", "PLUCK", "ORGAN", "SWEEP", "SFX"};
+      for (Slot& s : bank) {
+        s.patch = initPatch();
+        s.name = makeName("INIT");
+      }
+      const Slot* def = defaultBank();
+      for (int k = 0; k < 8; ++k) {
+        int i = 0;
+        while (i < kNumSlots && std::string(def[i].name.s) != originals[k]) ++i;
+        if (i == kNumSlots) throw std::logic_error(std::string("the default bank has no ") + originals[k]);
+        bank[k + 1] = def[i];
+      }
+    }
+  };
+  static const V31 v31;
+  const int idx = r.core().acquireBulk();
+  Bulk* b = r.core().bulk(idx);
+  if (!b) throw std::logic_error("no free bulk slot for the v3.1 bank layout");
+  b->kind = BulkKind::State;
+  b->stateResult = static_cast<int>(BlobResult::Ok);
+  CoreState& s = b->state;
+  s = r.st();
+  for (int i = 0; i < kNumSlots; ++i) s.bank[i] = v31.bank[i];
+  s.edit = s.stored = v31.bank[0].patch;
+  s.editName = v31.bank[0].name;
+  s.edited = s.manual = false;
+  s.currentSlot = s.pendingBank = 1;
+  s.pendingGroup = 0;
+  Command c = cmdOf(CommandType::LoadState, Source::System);
+  c.i = idx;
+  r.apply(c);
+  r.events();
+  return v31.bank;
+}
 
 }  // namespace vjn6::test

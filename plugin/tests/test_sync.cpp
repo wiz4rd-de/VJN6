@@ -73,6 +73,7 @@ void runFivePaths(bool mode106) {
   std::array<Path, 5> paths;
   for (auto& p : paths) {
     p.proc = makeProcessor();
+    useV31BankLayout(*p.proc);
     p.host = std::make_unique<TestHost>(*p.proc);
     p.listener = std::make_unique<HostListener>(*p.proc);
     auto* counter = &p.fieldEvents;
@@ -148,6 +149,7 @@ TEST_CASE("AC-S1.1 command, panel, SysEx, CC and host parameter give identical s
 namespace {
 void checkSlotSelection(const std::function<void(VJN6AudioProcessor&)>& select, int slot, bool hostOrigin) {
   auto p = makeProcessor();
+  useV31BankLayout(*p);
   TestHost host(*p);
   HostListener listener(*p);
   int fieldEvents = 0, hostEvents = 0;

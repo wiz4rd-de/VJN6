@@ -184,7 +184,7 @@ web/build_tests.sh --bench-only                # WASM under Node 22
 
 | File | Regenerate with | Check |
 | --- | --- | --- |
-| `banks/vjn6-default.vjn6bank`, `core/state/default_bank.inc` (default bank, §15.3) | edit `banks/default/*.json`, then `python3 tools/make_default_bank.py` | `python3 tools/make_default_bank.py --check` |
+| `banks/vjn6-default.vjn6bank`, `core/state/default_bank.inc`, `banks/default/001-…056-*.json`, `docs/FACTORY_BANK.md` (default bank, §15.3) | edit `banks/j60-factory-chart.csv` (the Juno-60 factory charts, slots 1–56) or `banks/default/058-…065-*.json` (the eight original patches), then `python3 tools/make_default_bank.py` | `python3 tools/make_default_bank.py --check` |
 | `core/files/nfc_tables.inc` (NFC data for name normalisation) | `python3 tools/gen_nfc_tables.py` | the header records the Unicode version; regenerate with Python 3.13 (Unicode 15.1.0) to avoid spurious diffs |
 | `tests/golden/display_table.json` (R-P5 / §4.8 reference values for AC-P5.1) | `./build/tools/display_table/vjn6_display_table tests/golden/display_table.json` (run from the repository root) | CI regenerates it and diffs |
 
@@ -240,10 +240,10 @@ plugin/                 JUCE AudioProcessor, WebBrowserComponent editor, standal
 web/                    worklet.cpp, build.sh (web module), build_tests.sh (WASM tests and benchmark)
 ui/                     Svelte 5 + TypeScript UI (src/, tests/), Vite config; one bundle for every build
 tests/                  Catch2 suite: engine/, midi/, panel/, files/, golden/, util/
-banks/                  vjn6-default.vjn6bank and its sources default/*.json
+banks/                  vjn6-default.vjn6bank, its sources j60-factory-chart.csv and default/*.json
 tools/                  make_default_bank.py, gen_nfc_tables.py, check_licences.py, syx_inspect.py,
                         bench/ (vjn6_bench), display_table/, capture/ (§15.4 measurement protocol)
-docs/                   BRIDGE.md, LICENSES.md, STATE.md
+docs/                   BRIDGE.md, FACTORY_BANK.md, LICENSES.md, STATE.md
 third_party/            JUCE (submodule, unmodified), Catch2 (submodule, tests only)
 .github/workflows/      ci.yml (PRs into main), smoke.yml (after merge to main)
 SPEC.md KICKOFF.md PLAN.md DECISIONS.md

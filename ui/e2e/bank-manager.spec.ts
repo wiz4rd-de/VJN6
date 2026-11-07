@@ -18,7 +18,10 @@ import {
 } from './fixtures';
 import { syxMessage, testBank, vjn6Bank, vjn6Patch, wavFile, type PatchSpec } from './files';
 
-const DEFAULT_NAMES = ['INIT', 'BRASS', 'STRINGS', 'PAD', 'BASS', 'PLUCK', 'ORGAN', 'SWEEP', 'SFX'];
+/** The first nine slots of the default bank (§15.3). */
+const DEFAULT_NAMES = [
+  'Strings 1', 'Strings 2', 'Strings 3', 'Organ 1', 'Organ 2', 'Organ 3', 'Brass', 'Phase Brass', 'Piano 1',
+];
 
 const TEST_PATCH: PatchSpec = {
   name: 'TEST PATCH',
@@ -89,7 +92,7 @@ test.describe('AC-F10.1 bank manager', () => {
     await expectNotice(dlg, 'Memory is protected.');
     await expectLedMessage(page, 'Pr', 'MEMORY PROTECTED');
     expect((await bank(page)).map((e) => e.n).slice(0, 9)).toEqual(DEFAULT_NAMES);
-    await expect(dlg.getByTestId('bank-name-2')).toHaveText('BRASS');
+    await expect(dlg.getByTestId('bank-name-2')).toHaveText('Strings 2');
 
     await setProtectInBm(page, dlg, false);
     await loadViaDialog(page, dlg, [file]);
@@ -117,7 +120,7 @@ test.describe('AC-F10.1 bank manager', () => {
     expect(s.edited).toBe(false);
     expect(s.slot).toBe(1);
     await expectNotice(dlg, 'Loaded One Shot.syx');
-    expect((await bank(page))[9].n).toBe('INIT'); // pp 9 did not write slot 10
+    expect((await bank(page))[9].n).toBe('Piano 2'); // pp 9 did not write slot 10
   });
 
   test('AC-F10.1 rename a row to é😀abcdefghijklm: protected → Pr, unchanged; not → ??abcdefghij', async ({ page }) => {
@@ -138,8 +141,8 @@ test.describe('AC-F10.1 bank manager', () => {
     await rename(3);
     await expectNotice(dlg, 'Memory is protected.');
     await expectLedMessage(page, 'Pr', 'MEMORY PROTECTED');
-    await expect(dlg.getByTestId('bank-name-3')).toHaveText('STRINGS');
-    expect((await bank(page))[2].n).toBe('STRINGS');
+    await expect(dlg.getByTestId('bank-name-3')).toHaveText('Strings 3');
+    expect((await bank(page))[2].n).toBe('Strings 3');
 
     await setProtectInBm(page, dlg, false);
     await rename(3);
@@ -153,7 +156,7 @@ test.describe('AC-F10.1 bank manager', () => {
     await dlg.getByTestId('bank-name-4').dblclick();
     await dlg.getByTestId('bank-rename').fill('NOPE');
     await dlg.getByTestId('bank-rename').press('Escape');
-    await expect(dlg.getByTestId('bank-name-4')).toHaveText('PAD');
+    await expect(dlg.getByTestId('bank-name-4')).toHaveText('Organ 1');
   });
 
   test('AC-F10.1 drag row 2 → 9 copies patch and name; drag a row → the edit buffer loads it, Manual', async ({
@@ -166,14 +169,14 @@ test.describe('AC-F10.1 bank manager', () => {
     const b0 = await bank(page);
 
     await dlg.getByTestId('bank-slot-2').dragTo(dlg.getByTestId('bank-row-9'));
-    await expect(dlg.getByTestId('bank-name-9')).toHaveText('BRASS');
+    await expect(dlg.getByTestId('bank-name-9')).toHaveText('Strings 2');
     const b1 = await bank(page);
     expect(b1[8]).toEqual(b0[1]);
     expect(b1.filter((_, i) => i !== 8)).toEqual(b0.filter((_, i) => i !== 8));
     unchanged(before, await state(page)); // edit buffer, stored patch and current slot unchanged
 
     await dlg.getByTestId('bank-disp-4').dragTo(dlg.getByTestId('bm-edit-target'));
-    const s = await waitForState(page, (st) => st.name === 'PAD' && st.manual);
+    const s = await waitForState(page, (st) => st.name === 'Organ 1' && st.manual);
     expect(s.edit).toEqual(b0[3].p);
     expect(s.slot).toBe(1);
     expect(await bank(page)).toEqual(b1);
@@ -184,13 +187,13 @@ test.describe('AC-F10.1 bank manager', () => {
     await dlg.getByTestId('bank-slot-3').dragTo(dlg.getByTestId('bank-row-10'));
     await expectNotice(dlg, 'Memory is protected.');
     await expectLedMessage(page, 'Pr', 'MEMORY PROTECTED');
-    expect((await bank(page))[9].n).toBe('INIT');
+    expect((await bank(page))[9].n).toBe('Piano 2');
   });
 
   test('AC-F10.1 export bank and patch in both formats: downloads with the §4.6 names', async ({ page }) => {
     await openAndStart(page);
-    await ctl(page, 'patch-2').click(); // BRASS
-    const s = await waitForState(page, (st) => st.name === 'BRASS');
+    await ctl(page, 'patch-2').click(); // slot 2, `Strings 2` (a name with a space)
+    const s = await waitForState(page, (st) => st.name === 'Strings 2');
     const dlg = await openBankManager(page);
     const b = await bank(page);
 
@@ -232,14 +235,14 @@ test.describe('AC-F10.1 bank manager', () => {
     }
 
     const patchJson = await download('bm-export-patch-json');
-    expect(patchJson.name).toBe('BRASS.vjn6');
+    expect(patchJson.name).toBe('Strings 2.vjn6');
     const pj = JSON.parse(patchJson.bytes.toString('utf8'));
     expect(pj.vjn6).toBe(1);
-    expect(pj.name).toBe('BRASS');
+    expect(pj.name).toBe('Strings 2');
     expect(pj.sliders).toEqual(s.edit.slice(0, 16));
 
     const patchSyx = await download('bm-export-patch-syx');
-    expect(patchSyx.name).toBe('BRASS.syx');
+    expect(patchSyx.name).toBe('Strings 2.syx');
     expect(patchSyx.bytes.length).toBe(24);
     expect([...patchSyx.bytes.subarray(0, 5)]).toEqual([0xf0, 0x41, 0x31, 0x00, 0x00]);
     expect([...patchSyx.bytes.subarray(5, 21)]).toEqual(s.edit.slice(0, 16));

@@ -511,7 +511,9 @@ test('AC-S3.3 web with mocked MIDI: CC74 64 injected → the FREQ slider shows 5
   const m = midi(page);
   await m.waitListening();
   const freq = ctl(page, 'vcf-freq');
-  await expect(freq).toHaveAttribute('data-value', '127');
+  const start = (await state(page)).edit[F.VCF_FREQ]; // slot 1, `Strings 1`
+  expect(start).not.toBe(64);
+  await expect(freq).toHaveAttribute('data-value', String(start));
 
   // measured in the page: from the injected message to the slider's displayed value
   const measure = (cc: number, shown: string) =>

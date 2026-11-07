@@ -172,6 +172,7 @@ TEST_CASE("AC-M1.2 notes, velocity 0, pitch bend, CC1, CC64, CC120, CC123", "[mi
     const bool is106 = m == Mode::J106;
     (void)is106;
     Rig r(48000.0, m);
+    useV31BankLayout(r);
     r.toBoundary();
     r.events();
 
