@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.25)
 if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "macOS deployment target" FORCE)
 endif()
-project(VJN6 VERSION 0.1.0 LANGUAGES C CXX)
+project(VJN6 VERSION 0.1.1 LANGUAGES C CXX)
 
 option(VJN6_BUILD_PLUGIN "Build the JUCE plugin (VST3/AU) and standalone app" ON)
 option(VJN6_BUILD_WEB "Build the Emscripten web module (use with emcmake)" OFF)

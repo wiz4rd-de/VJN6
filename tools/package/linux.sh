@@ -27,7 +27,9 @@ Standalone app: run ./VJN6
 VST3 plugin:    copy VJN6.vst3 into ~/.vst3 (for you) or /usr/lib/vst3 (for everyone)
     mkdir -p ~/.vst3 && cp -R VJN6.vst3 ~/.vst3/
 
-NOTICES.txt holds the licences of the third-party code built into VJN6.
+VJN6 is released under the MIT License. NOTICES.txt holds the licences of VJN6
+and of the third-party code built into it, and the attribution of the Roland
+factory patches in the default bank, which the MIT License does not cover.
 https://github.com/wiz4rd-de/VJN6
 EOF
 owner=()

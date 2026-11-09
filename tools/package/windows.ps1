@@ -45,7 +45,9 @@ The interface needs the Microsoft Edge WebView2 Runtime. Windows 11 includes it;
 on Windows 10, install it from https://developer.microsoft.com/microsoft-edge/webview2/
 if VJN6 says it is missing.
 
-NOTICES.txt holds the licences of the third-party code built into VJN6.
+VJN6 is released under the MIT License. NOTICES.txt holds the licences of VJN6
+and of the third-party code built into it, and the attribution of the Roland
+factory patches in the default bank, which the MIT License does not cover.
 https://github.com/wiz4rd-de/VJN6
 "@ | Set-Content -Path (Join-Path $stage "INSTALL.txt") -Encoding utf8
 $zip = Join-Path $Out "$name.zip"
