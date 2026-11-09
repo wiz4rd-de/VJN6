@@ -1,0 +1,34 @@
+{
+  "slot": 60,
+  "name": "PAD",
+  "description": "Wide PWM pad with sub, long envelope, Chorus I+II.",
+  "sliders": {
+    "lfo_rate": 30,
+    "lfo_delay": 50,
+    "dco_lfo": 0,
+    "dco_pwm": 90,
+    "noise": 0,
+    "vcf_freq": 58,
+    "vcf_res": 30,
+    "vcf_env": 30,
+    "vcf_lfo": 12,
+    "vcf_kybd": 50,
+    "vca_level": 105,
+    "env_a": 80,
+    "env_d": 90,
+    "env_s": 100,
+    "env_r": 85,
+    "sub_level": 30
+  },
+  "switches": {
+    "range": 1,
+    "pulse": 1,
+    "saw": 0,
+    "sub": 1,
+    "chorus": 3,
+    "pwm_src": 0,
+    "vcf_pol": 0,
+    "vca_mode": 0,
+    "hpf": 0
+  }
+}

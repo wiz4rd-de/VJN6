@@ -1,0 +1,351 @@
+# VJN6 full suite (SPEC §15.1, AC-B1, AC-PL1, AC-N1.1, AC-L1.1 to AC-L5.1).
+#
+# Owner rule (~/.claude/CLAUDE.md, DECISIONS.md "CI"): the full suite runs once per phase, only on pull
+# requests into main and on a deliberate manual dispatch. It never runs on pushes to development branches
+# or on pull requests into develop/** or epic/**; per-ticket verification uses the local gates (README).
+# After a merge to main only the smoke workflow (smoke.yml) runs. Pushes to an open PR into main re-run
+# this workflow, so batch fixes into one push.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.12"
+  # Emscripten SDK version for the wasm job ("latest" or an exact version such as 4.0.10).
+  EMSDK_VERSION: latest
+  # pluginval (GPL-3) is downloaded at run time as a separate tool into the runner's temp directory;
+  # it is never committed, linked or shipped (R-L2). "latest" or a release tag such as v1.0.3.
+  PLUGINVAL_VERSION: latest
+  # The WebView2 SDK package JUCE links statically on Windows (NEEDS_WEBVIEW2).
+  WEBVIEW2_VERSION: 1.0.3485.44
+
+jobs:
+  licence:
+    name: Licence check (R-L3, AC-L1.1, AC-L2.1, AC-L4.1, AC-L5.1)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Licence and branding check
+        run: python3 tools/check_licences.py
+
+      - name: Licence check self-test (plants the GPL title in a temporary copy)
+        run: python3 tools/check_licences.py --self-test
+
+  desktop:
+    name: ${{ matrix.name }}
+    needs: licence
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      # Every platform runs to the end, so one run reports all failures (the full suite runs once per
+      # push to the PR; a cancelled platform would need another run to show its result).
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal (Xcode; Standalone, VST3, AU)
+            os: macos-15
+          - name: Windows (MSVC; Standalone, VST3)
+            os: windows-2022
+          - name: Ubuntu 24.04 (webkit2gtk-4.1; Standalone, VST3)
+            os: ubuntu-24.04
+    env:
+      # Signing and notarisation run only when these secrets exist (§15.1, §15.4).
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      ARTEFACTS: build/plugin/VJN6_artefacts/Release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build xvfb \
+            libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev \
+            libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev \
+            libxrender-dev libxi-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libegl-dev libglu1-mesa-dev mesa-common-dev
+
+      - name: Install the WebView2 SDK package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dir="${RUNNER_TEMP//\\//}/webview2"
+          nuget install Microsoft.Web.WebView2 -Version "$WEBVIEW2_VERSION" -OutputDirectory "$dir" -NonInteractive
+          echo "WEBVIEW2_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Build the UI bundle (ui/dist, served by the plugin editor)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure (CMake >= 3.25)
+        run: |
+          cmake --version
+          args=(-DVJN6_BUILD_PLUGIN=ON -DVJN6_BUILD_TESTS=ON -DVJN6_BUILD_WEB=OFF)
+          case "$RUNNER_OS" in
+            macOS)   args+=(-G Xcode "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64") ;;
+            Windows) args+=(-G "Visual Studio 17 2022" -A x64 "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$WEBVIEW2_DIR") ;;
+            Linux)   args+=(-G Ninja -DCMAKE_BUILD_TYPE=Release) ;;
+          esac
+          cmake -S . -B build "${args[@]}"
+
+      - name: Build (core, tests, benchmark, Standalone, VST3, AU on macOS)
+        run: cmake --build build --config Release --parallel
+
+      - name: Test (vjn6_tests, plugin tests and licence tests via ctest)
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1920x1080x24" ctest --test-dir build -C Release --output-on-failure
+          else
+            ctest --test-dir build -C Release --output-on-failure
+          fi
+
+      - name: Licence check of the built plugin metadata (AC-L5.1)
+        run: python tools/check_licences.py --check metadata --metadata build/plugin
+
+      - name: Locate the built plugins
+        run: |
+          if [ ! -d "$ARTEFACTS" ]; then
+            found=$(find build -type d -name VJN6_artefacts | head -n 1)
+            echo "ARTEFACTS=$found/Release" >> "$GITHUB_ENV"
+            ARTEFACTS="$found/Release"
+          fi
+          ls -la "$ARTEFACTS" "$ARTEFACTS/VST3"
+
+      - name: Download pluginval (separate GPL-3 tool, never committed)
+        run: |
+          case "$RUNNER_OS" in
+            macOS)   asset=pluginval_macOS.zip ;;
+            Windows) asset=pluginval_Windows.zip ;;
+            Linux)   asset=pluginval_Linux.zip ;;
+          esac
+          if [ "$PLUGINVAL_VERSION" = latest ]; then
+            url="https://github.com/Tracktion/pluginval/releases/latest/download/$asset"
+          else
+            url="https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/$asset"
+          fi
+          dir="$RUNNER_TEMP/pluginval"
+          mkdir -p "$dir"
+          curl -fsSL --retry 3 -o "$dir/pluginval.zip" "$url"
+          (cd "$dir" && cmake -E tar xf pluginval.zip)
+          case "$RUNNER_OS" in
+            macOS)   bin="$dir/pluginval.app/Contents/MacOS/pluginval" ;;
+            Windows) bin="$dir/pluginval.exe" ;;
+            Linux)   bin="$dir/pluginval" ;;
+          esac
+          chmod +x "$bin" || true
+          echo "PLUGINVAL=$bin" >> "$GITHUB_ENV"
+
+      - name: pluginval strictness 5, VST3 (AC-PL1)
+        run: |
+          logs="$RUNNER_TEMP/pluginval-logs/vst3"
+          mkdir -p "$logs"
+          cmd=("$PLUGINVAL" --strictness-level 5 --validate-in-process --timeout-ms 300000 --output-dir "$logs"
+               --validate "$ARTEFACTS/VST3/VJN6.vst3")
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1920x1080x24" "${cmd[@]}"
+          else
+            "${cmd[@]}"
+          fi
+
+      - name: pluginval strictness 5, AU (AC-PL1, macOS)
+        if: runner.os == 'macOS'
+        run: |
+          component="$HOME/Library/Audio/Plug-Ins/Components/VJN6.component"
+          [ -d "$component" ] || component="$ARTEFACTS/AU/VJN6.component"
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          logs="$RUNNER_TEMP/pluginval-logs/au"
+          mkdir -p "$logs"
+          "$PLUGINVAL" --strictness-level 5 --validate-in-process --timeout-ms 300000 --output-dir "$logs" \
+            --validate "$component"
+
+      - name: Upload pluginval logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pluginval-logs-${{ runner.os }}
+          path: ${{ runner.temp }}/pluginval-logs
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Native benchmark (AC-N1.1; < 8 % of real time, µs per 128-sample block)
+        if: runner.os == 'Linux'
+        run: |
+          bench=$(find build -type f -name vjn6_bench -perm -u+x -not -path "*/CMakeFiles/*" | head -n 1)
+          "$bench"
+
+      - name: Golden check (generated files and goldens match the sources)
+        if: runner.os == 'Linux'
+        run: |
+          python tools/make_default_bank.py --check
+          table=$(find build -type f -name vjn6_display_table -perm -u+x -not -path "*/CMakeFiles/*" | head -n 1)
+          "$table" "$RUNNER_TEMP/display_table.json"
+          diff -u tests/golden/display_table.json "$RUNNER_TEMP/display_table.json"
+          # Building and testing must not rewrite tracked files (goldens change only with an intended change).
+          git diff --exit-code --stat
+
+      - name: Sign (macOS, Developer ID; skipped without secrets)
+        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != ''
+        run: |
+          keychain="$RUNNER_TEMP/vjn6-signing.keychain-db"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          code="$(dirname "$ARTEFACTS")/JuceLibraryCode"
+          for pair in "Standalone/VJN6.app:VJN6_Standalone" "VST3/VJN6.vst3:VJN6_VST3" "AU/VJN6.component:VJN6_AU"; do
+            bundle="$ARTEFACTS/${pair%%:*}"
+            ent="$code/${pair##*:}.entitlements"
+            extra=()
+            [ -f "$ent" ] && extra=(--entitlements "$ent")
+            codesign --force --timestamp --options runtime "${extra[@]}" --sign "$MACOS_SIGNING_IDENTITY" "$bundle"
+            codesign --verify --strict --verbose=2 "$bundle"
+          done
+
+      - name: Notarise and staple (macOS; skipped without secrets)
+        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != '' && env.APPLE_ID != ''
+        run: |
+          for b in Standalone/VJN6.app VST3/VJN6.vst3 AU/VJN6.component; do
+            bundle="$ARTEFACTS/$b"
+            zip="$RUNNER_TEMP/$(basename "$bundle").zip"
+            ditto -c -k --keepParent "$bundle" "$zip"
+            xcrun notarytool submit "$zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" --wait
+            xcrun stapler staple "$bundle"
+          done
+
+      - name: Sign (Windows, Authenticode; skipped without secrets)
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_PFX != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          $files = @(
+            (Join-Path $env:ARTEFACTS 'Standalone\VJN6.exe'),
+            (Join-Path $env:ARTEFACTS 'VST3\VJN6.vst3\Contents\x86_64-win\VJN6.vst3'))
+          foreach ($f in $files) {
+            & $signtool.FullName sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 `
+              /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD $f
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          Remove-Item $pfx
+
+      - name: Upload signed builds (only when signed)
+        if: (runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != '') || (runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_PFX != '')
+        uses: actions/upload-artifact@v4
+        with:
+          name: VJN6-${{ runner.os }}
+          path: |
+            ${{ env.ARTEFACTS }}/Standalone
+            ${{ env.ARTEFACTS }}/VST3
+            ${{ env.ARTEFACTS }}/AU
+          retention-days: 14
+          if-no-files-found: ignore
+
+  wasm:
+    name: wasm (emsdk) and web (Vitest, Playwright Chromium + WebKit)
+    needs: licence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out Catch2 (JUCE is not needed for the web build)
+        run: git submodule update --init --depth 1 third_party/Catch2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install emsdk
+        run: |
+          # Node 22 from setup-node runs the WASM tests and benchmark (§9.1), not emsdk's bundled node.
+          echo "NODE=$(command -v node)" >> "$GITHUB_ENV"
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION"
+          echo "EMSDK=$RUNNER_TEMP/emsdk" >> "$GITHUB_ENV"
+
+      - name: WASM test suite (vjn6_tests under Node, identical expectations)
+        run: web/build_tests.sh --tests-only
+
+      - name: WASM benchmark (AC-N1.1; < 35 % of real time, µs per 128-sample block)
+        run: web/build_tests.sh --bench-only
+
+      - name: Web module (web/build.sh -> ui/public/vjn6.js, vjn6.wasm)
+        run: web/build.sh
+
+      - name: Install UI dependencies
+        run: npm ci
+
+      - name: Svelte and TypeScript checks
+        run: npm run check
+
+      - name: Vitest
+        run: npm test
+
+      - name: Build the UI bundle
+        run: npm run build
+
+      - name: Install Playwright browsers (Chromium, WebKit)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Playwright end-to-end tests (Chromium + WebKit, against the web build)
+        run: npm run test:e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            ui/playwright-report
+            ui/test-results
+          retention-days: 7
+          if-no-files-found: ignore

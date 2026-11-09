@@ -1,6 +1,17 @@
 # VJN6 — Product Spec
 
-Nov 6, 2026 · Marco Funk · v3.1
+Nov 6, 2026 · Marco Funk · v3.2
+
+**Changelog v3.2 — Juno-60 corrections** (60 mode only, from Roland's Juno-60 Owner's Manual; 106 mode is unchanged, the default bank is shared):
+
+- **C-1** Square wave confirmed: no separate square control; a square is the pulse at PWM 0 (MANUAL), the sub is a square one octave down (R-E3).
+- **C-2** No RANGE in 60 mode: 60 mode reads W0 as 1 (8′), the stored value is kept; the RANGE buttons are drawn in 106 mode only (§4.1, R-E3, §5.2, R-M1, §8, AC-E3.1).
+- **C-3** Octave transpose is labelled D/N/U (§4.2, §4.8, §5.2).
+- **C-4** 60 VCA LEVEL is a centre-zero slider −5…+5: v = byte/12.7 − 5; the byte and the gain law are unchanged (R-E6, R-P5, R-U1, §4.8, §5.2, §15.4).
+- **C-5** 60 VCF order: FREQ, RES, polarity switch, ENV, LFO, KYBD (§5.2, R-U3).
+- **C-6** 60 chorus: OFF, I, II radio buttons (OFF without LED); I+II is the combination press CHORUS I ↔ CHORUS II (§5.2, R-U4).
+- **C-7** The default bank holds the 56 Juno-60 factory patches in slots 1–56, INIT in 57 and the eight original patches in 58–65 (R-L2, §12, §15.3, §15.4, AC-D7.1, AC-D7.2).
+- **C-8** Tests: AC-E1.3, AC-E3.1, AC-P1.1, AC-P4.1, AC-P5.1, AC-PL2, AC-U1.1, AC-U3.1, AC-U4.1, AC-D7.1, new AC-D7.2, AC-SC1, §9.1.
 
 This is the single source of truth for building VJN6. Sections 1–13 and 15 are decided. §14 lists what is deliberately left to the implementer. Anything this spec does not cover is handled by the rule in KICKOFF.md: choose the simplest behaviour consistent with the overview, glossary and existing rules — the one that adds no new state, setting or UI — record it in `DECISIONS.md`, and continue.
 
@@ -70,7 +81,7 @@ Every term below is used with exactly this meaning in the rest of the spec.
 | **Control tick** | 106 mode: the 4.2 ms step at which envelopes, LFO, portamento, pitch divisors and the cutoff word are recomputed (R-E1). |
 | **Cutoff word** | 106 mode: the 14-bit integer the firmware sends to the filter DAC (R-E5). |
 | **Lever** | The bender: a spring-loaded horizontal control, −1…+1. In 106 mode it also has a push zone that adds LFO vibrato. |
-| **Combination press** | Two panel buttons pressed together on the hardware (60 BANK 1+5, 2+5; 106 POLY 1+POLY 2). With a mouse: Shift+click (R-U4). |
+| **Combination press** | Two panel buttons pressed together on the hardware (60 BANK 1+5, 2+5, CHORUS I+II; 106 POLY 1+POLY 2). With a mouse: Shift+click (R-U4). |
 | **MIDI clock running** | A MIDI timing clock (F8) was received in the last 500 ms. |
 | **Panel input** | A mouse, wheel or typed action on a front-panel control, or one of the shortcuts Alt+M, Alt+W, Alt+1…8. Not panel input: opening or using an overlay, the computer-keyboard map of §7.6, MIDI, host automation. |
 | **WRITE armed** | The state between pressing WRITE and its completion or cancellation (F-5). |
@@ -92,7 +103,7 @@ Every term below is used with exactly this meaning in the rest of the spec.
 
 ### 4.1 Patch
 
-A patch is 16 slider bytes plus 9 switch fields. In the rest of this spec, slider byte *n* is written **Bn** (B0–B15) and switch field *n* is written **Wn** (W0–W8). The slider order is the Juno-106 SysEx order, so a patch round-trips through SysEx without reordering. Fields marked **60** exist only on the Juno-60; in 106 mode they are read as the value in the last column and are not shown.
+A patch is 16 slider bytes plus 9 switch fields. In the rest of this spec, slider byte *n* is written **Bn** (B0–B15) and switch field *n* is written **Wn** (W0–W8). The slider order is the Juno-106 SysEx order, so a patch round-trips through SysEx without reordering. Fields marked **60** exist only on the Juno-60; in 106 mode they are read as the value in the last column and are not shown. W0 (Range) exists only on the Juno-106 (the Juno-60 has no DCO RANGE control): in 60 mode it is read as 1 (8′) and not shown, and its stored value is kept, like W3 in 106 mode.
 
 | Field | Parameter | Range | 106 mode reads |
 | --- | --- | --- | --- |
@@ -112,7 +123,7 @@ A patch is 16 slider bytes plus 9 switch fields. In the rest of this spec, slide
 | B13 | ENV sustain | 0–127 |  |
 | B14 | ENV release | 0–127 |  |
 | B15 | Sub-oscillator level | 0–127 |  |
-| W0 | Range | 0 = 16′, 1 = 8′, 2 = 4′ |  |
+| W0 | Range | 0 = 16′, 1 = 8′, 2 = 4′ | (60 mode reads **1 (8′)**) |
 | W1 | Pulse on | 0–1 |  |
 | W2 | Saw on | 0–1 |  |
 | W3 | Sub on **60** | 0–1 | 1 |
@@ -136,7 +147,7 @@ A patch is 16 slider bytes plus 9 switch fields. In the rest of this spec, slide
 | LFO trigger mode | 60 | 0 AUTO, 1 MANUAL | 0 |
 | Hold | 60 | 0–1 | 0 |
 | Arpeggio on / mode / range / rate | 60 | 0–1 / 0 UP, 1 U&D, 2 DOWN / 1–3 oct / 0–127 | off / 0 / 1 / 64 |
-| Octave transpose | 60 | 0 L (−12), 1 N, 2 H (+12) | 1 |
+| Octave transpose | 60 | 0 D (−12), 1 N, 2 U (+12) | 1 |
 | Key transpose | 106 | −12…+12 semitones | 0 |
 | Master tune | both | 0–127, 64 = 0; cents = (v − 64) × 50/64 | 64 |
 | Master volume | both | 0–127; gain = (v/127)² | 127 |
@@ -239,7 +250,7 @@ The blob begins with the magic `"VJN6"` and a u16 version (1), and ends with a C
 | Performance | 14 | Int / Choice / Bool as §4.2 | `f_key_mode`, `f_porta_on`, `f_porta_time`, `f_bend_dco`, `f_bend_vcf`, `f_lfo_trig_sens`, `f_lfo_trig_mode`, `f_hold`, `f_arp_on`, `f_arp_mode`, `f_arp_range`, `f_arp_rate`, `f_oct_transpose`, `f_key_transpose` |
 | Master tune | 1 | `AudioParameterInt` 0–127 | `g_tune` |
 
-That is 16 + 9 + 14 + 1 = **40** host parameters, in the order of this table. Display names do not change with the mode: sliders and switches use the §4.1 "Parameter" names with an initial capital (`LFO rate`, `Sub on`); performance parameters: `Key mode`, `Portamento on`, `Portamento time`, `Bender DCO sensitivity`, `Bender VCF sensitivity`, `LFO trigger sensitivity`, `LFO trigger mode`, `Hold`, `Arpeggio on`, `Arpeggio mode`, `Arpeggio range`, `Arpeggio rate`, `Octave transpose`, `Key transpose`; `Master tune`. Value strings follow R-P5 and R-P6: sliders 0.0–10.0 (`v/12.7`, one decimal); choices: range `16'`, `8'`, `4'`; on/off fields `OFF`, `ON`; chorus `OFF`, `I`, `II`, `I+II (60)`; PWM source `LFO`, `MANUAL`, `ENV (60)`; polarity `NORMAL`, `INVERTED`; VCA `ENV`, `GATE`; HPF `0`–`3`; key mode `POLY 1`, `POLY 2`, `UNISON`; LFO trigger mode `AUTO`, `MANUAL`; arpeggio mode `UP`, `U&D`, `DOWN`; arpeggio range `1`–`3`; octave transpose `L`, `N`, `H`; key transpose `-12`…`+12`; tune in cents with one decimal and sign (`+10.2`). Parameters the active mode does not use are still exposed, with their effect as §4.1 and §4.2. A host write of an unchanged value has no effect. Name, bank, MIDI channel, omni, MIDI function, memory protect, master volume and the §4.4 settings live only in state.
+That is 16 + 9 + 14 + 1 = **40** host parameters, in the order of this table. Display names do not change with the mode: sliders and switches use the §4.1 "Parameter" names with an initial capital (`LFO rate`, `Sub on`); performance parameters: `Key mode`, `Portamento on`, `Portamento time`, `Bender DCO sensitivity`, `Bender VCF sensitivity`, `LFO trigger sensitivity`, `LFO trigger mode`, `Hold`, `Arpeggio on`, `Arpeggio mode`, `Arpeggio range`, `Arpeggio rate`, `Octave transpose`, `Key transpose`; `Master tune`. Value strings follow R-P5 and R-P6: sliders 0.0–10.0 (`v/12.7`, one decimal), except `p_vca_level`, whose string follows the active mode: signed `-5.0`…`+5.0` (`v/12.7 − 5`) in 60 mode, 0.0–10.0 in 106 mode; choices: range `16'`, `8'`, `4'`; on/off fields `OFF`, `ON`; chorus `OFF`, `I`, `II`, `I+II (60)`; PWM source `LFO`, `MANUAL`, `ENV (60)`; polarity `NORMAL`, `INVERTED`; VCA `ENV`, `GATE`; HPF `0`–`3`; key mode `POLY 1`, `POLY 2`, `UNISON`; LFO trigger mode `AUTO`, `MANUAL`; arpeggio mode `UP`, `U&D`, `DOWN`; arpeggio range `1`–`3`; octave transpose `D`, `N`, `U`; key transpose `-12`…`+12`; tune in cents with one decimal and sign (`+10.2`). Parameters the active mode does not use are still exposed, with their effect as §4.1 and §4.2 (for example `s_range` in 60 mode, which has no effect). A host write of an unchanged value has no effect. Name, bank, MIDI channel, omni, MIDI function, memory protect, master volume and the §4.4 settings live only in state.
 
 **Host programs:** 128, one per slot, named after the slot name; renames and imports update the host's program names. Selecting program *i* selects slot *i* + 1 (F-4) in every mode and MIDI function, and never transmits. Selecting the program that equals the current slot does nothing (so a host's restore call does not reload an EDITED buffer). The current program is the current slot − 1.
 
@@ -253,30 +264,30 @@ There is no separate programmer view: the hardware already shows every parameter
 
 ### 5.2 Panel layout (both modes)
 
-The panel is one row of sections, left to right, each a labelled box, above a memory row. Sections that exist in only one mode are drawn in that mode; the others keep their positions, so switching mode moves nothing that both share. Boxes (x, y, w, h); inside each box the controls appear in the order listed:
+The panel is one row of sections, left to right, each a labelled box, above a memory row. Sections that exist in only one mode are drawn in that mode; the others keep their positions, so switching mode moves nothing that both share. The one exception is the VCF box, whose 60-mode order follows the Juno-60 panel (C-5), so its polarity switch and its ENV, LFO and KYBD sliders sit at different positions in the two modes. Boxes (x, y, w, h); inside each box the controls appear in the order listed:
 
 | Section | Box | 60 mode contents | 106 mode contents |
 | --- | --- | --- | --- |
-| Controller | 20, 60, 180, 400 | VOLUME knob; OCTAVE TRANSPOSE L/N/H switch; LFO TRIG button (momentary); DCO / VCF bender sensitivity knobs; lever | VOLUME knob; DCO / VCF bender sensitivity knobs; LFO TRIG sensitivity knob; PORTAMENTO TIME knob; lever with push zone |
+| Controller | 20, 60, 180, 400 | VOLUME knob; OCTAVE TRANSPOSE D/N/U switch; LFO TRIG button (momentary); DCO / VCF bender sensitivity knobs; lever | VOLUME knob; DCO / VCF bender sensitivity knobs; LFO TRIG sensitivity knob; PORTAMENTO TIME knob; lever with push zone |
 | LFO | 216, 60, 100, 400 | RATE, DELAY TIME sliders; AUTO/MAN switch | RATE, DELAY TIME sliders |
-| DCO | 332, 60, 300, 400 | LFO, PWM sliders; PWM switch LFO/MAN/ENV; RANGE 16′/8′/4′ buttons; PULSE, SAW, SUB buttons; SUB LEVEL, NOISE sliders | LFO, PWM sliders; PWM switch LFO/MAN; RANGE buttons; PULSE, SAW buttons; SUB, NOISE sliders |
+| DCO | 332, 60, 300, 400 | LFO, PWM sliders; PWM switch LFO/MAN/ENV; PULSE, SAW, SUB buttons; SUB LEVEL, NOISE sliders (no RANGE: the Juno-60 has none; its place stays empty panel, because PULSE and SAW are shared with 106 mode and do not move) | LFO, PWM sliders; PWM switch LFO/MAN; RANGE 16′/8′/4′ buttons; PULSE, SAW buttons; SUB, NOISE sliders |
 | HPF | 648, 60, 60, 400 | 4-position switch 0–3 (0 at bottom) | 4-position slider 0–3 (0 at bottom) |
-| VCF | 724, 60, 230, 400 | FREQ, RES, ENV, LFO, KYBD sliders; polarity switch +/− | same; polarity switch NORMAL/INVERTED |
-| VCA | 970, 60, 90, 400 | ENV/GATE switch; LEVEL slider | same |
+| VCF | 724, 60, 230, 400 | FREQ, RES sliders; polarity switch +/−; ENV, LFO, KYBD sliders | FREQ, RES, ENV, LFO, KYBD sliders; polarity switch NORMAL/INVERTED |
+| VCA | 970, 60, 90, 400 | ENV/GATE switch; LEVEL slider (centre-zero, −5…+5) | ENV/GATE switch; LEVEL slider |
 | ENV | 1076, 60, 160, 400 | A, D, S, R sliders | same |
-| Chorus | 1252, 60, 60, 400 | I, II buttons | OFF, I, II buttons |
+| Chorus | 1252, 60, 60, 400 | OFF, I, II buttons (OFF has no LED) | OFF, I, II buttons |
 | Memory | 20, 476, 1292, 76 | 2-digit LED; BANK 1–5, PATCH 1–8 buttons; MANUAL, WRITE, HOLD buttons; ARPEGGIO ON button, MODE (UP/U&D/DOWN) and RANGE (1/2/3) switches, RATE knob | 2-digit LED; A, B group buttons; BANK 1–8, PATCH 1–8 buttons; MANUAL, WRITE; POLY 1, POLY 2; PORTAMENTO button; KEY TRANSPOSE button |
 | Right edge | 1328, 60, 52, 492 | TUNE knob, wordmark `VJN6`, mode badge `60` | same, badge `106` |
 
-Sliders are 20 × 300 px with a tick scale 0–10. Every slider's value is the patch byte: position = byte/127 (106 HPF slider: W8/3). Buttons are 26 × 26 with an LED. Knobs are 44 px rotary. Switches with n positions are drawn as a vertical slide switch. The 106 HPF slider snaps to 4 positions.
+Sliders are 20 × 300 px with a tick scale 0–10; the 60 VCA LEVEL slider's scale reads −5…+5 with 0 at the centre (R-P5). Every slider's value is the patch byte: position = byte/127 (106 HPF slider: W8/3). Buttons are 26 × 26 with an LED (60 chorus OFF: none). Knobs are 44 px rotary. Switches with n positions are drawn as a vertical slide switch. The 106 HPF slider snaps to 4 positions.
 
-**Button behaviour.** RANGE: three radio buttons. 60 chorus: I and II each toggle their own state (off / I / II / both lit = I+II). 106 chorus: OFF, I, II are radio buttons. PULSE, SAW, SUB, PORTAMENTO, HOLD, ARPEGGIO ON: toggles. A click on a radio button writes its value when it differs from the stored field (so clicking the lit Chorus I while W4 = 3 in 106 mode writes 1, sets EDITED and transmits). POLY 1 / POLY 2: radio buttons; the combination press (R-U4) selects UNISON; a plain click on either afterwards leaves UNISON. LFO TRIG (60): held from mouse-down until mouse-up anywhere, window blur or editor close; on keyboard focus, held while Enter is held. A/B: radio buttons. Send-patch and similar disabled controls show their reason as a tooltip.
+**Button behaviour.** RANGE (106 mode only): three radio buttons. Chorus, both modes: OFF, I, II are radio buttons writing W4 = 0, 1, 2. In 60 mode, I+II (W4 = 3) is the combination press CHORUS I ↔ CHORUS II (R-U4): a Shift+click on I while II is lit, or on II while I is lit, writes 3; repeating it while in I+II does nothing; a plain click on I or II while in I+II selects that single mode. PULSE, SAW, SUB, PORTAMENTO, HOLD, ARPEGGIO ON: toggles. A click on a radio button writes its value when it differs from the stored field (so clicking the lit Chorus I while W4 = 3 writes 1, sets EDITED and, in 106 mode, transmits). POLY 1 / POLY 2: radio buttons; the combination press (R-U4) selects UNISON; a plain click on either afterwards leaves UNISON. LFO TRIG (60): held from mouse-down until mouse-up anywhere, window blur or editor close; on keyboard focus, held while Enter is held. A/B: radio buttons. Send-patch and similar disabled controls show their reason as a tooltip.
 
 **Button LEDs.**
 
 | Button | LED lit |
 | --- | --- |
-| RANGE, chorus, PULSE, SAW, SUB, PORTAMENTO, HOLD, ARPEGGIO ON | while their state is on / selected |
+| RANGE (106 mode only), chorus, PULSE, SAW, SUB, PORTAMENTO, HOLD, ARPEGGIO ON | while their state is on / selected; 60 chorus: I lit for W4 = 1 or 3, II lit for W4 = 2 or 3, OFF has no LED; 106 chorus: the selected one, W4 = 3 read as I |
 | POLY 1, POLY 2 | the selected one; both in UNISON |
 | A, B, BANK | the pending group and pending bank number (BANK 1+5 or 2+5 for banks 6/7 in 60 mode) |
 | PATCH | the current slot's patch, while not Manual and the pending bank equals the current slot's bank number; otherwise none |
@@ -450,12 +461,12 @@ The sound-engine rules define what VJN6 sounds like; the engine tests in §13.1 
 
 **R-E3 DCO.** One per voice: a 16-bit counter model driving a sawtooth, a pulse comparator, a ÷2 sub-oscillator; one noise generator shared by all voices.
 
-- **Pitch.** `cents = 100·(note − 69) + range + transpose + tune + bend + lfo + porta`, with range = −1200 / 0 / +1200 cents for 16′ / 8′ / 4′, transpose in cents (60: octave transpose; 106: key transpose × 100), tune = (master tune − 64) × 50/64 (SN ±50 cents), bend and lfo from R-E11 and R-E8, porta from R-E11. f = 440 × 2^(cents/1200).
+- **Pitch.** `cents = 100·(note − 69) + range + transpose + tune + bend + lfo + porta`, with range = −1200 / 0 / +1200 cents for 16′ / 8′ / 4′ in 106 mode and always 0 cents in 60 mode (the Juno-60 has no RANGE control, so W0 is read as 8′ and octave shifts come only from octave transpose), transpose in cents (60: octave transpose; 106: key transpose × 100), tune = (master tune − 64) × 50/64 (SN ±50 cents), bend and lfo from R-E11 and R-E8, porta from R-E11. f = 440 × 2^(cents/1200).
 - **60 mode:** all six voices share one clock: bend, lfo and tune are one global multiplier updated per control step and interpolated per sample (SN: ±1050 cents total range of the master clock). Pitch is continuous; f is clamped to 8 Hz…0.45 × the oversampled rate.
 - **106 mode:** per voice, the firmware computes the divisor on each control tick: `N = round(f_clk / f)`, `f_clk` = 1 / 2 / 4 MHz for 16′ / 8′ / 4′ (SN), N clamped to 2…65535 (so 16′ cannot go below 15.26 Hz, as on the hardware). The DCO frequency is `f_clk / N` and changes only at the end of the current cycle (counter reload) (CA).
 - **Phase.** Each DCO has a phase p ∈ [0, 1) that wraps at the reset. Phase is free-running: a note-on does not reset it (CA); each voice starts at a phase drawn from the variation generator (R-E12) at prepare(). UNISON does not align phases, so the stacked level depends on the phases.
 - **Sawtooth:** 60 mode falling, `saw = 1 − 2p`; 106 mode rising, `saw = 2p − 1` (CA); band-limited at the reset (≤ −70 dB alias, AC-E3.6); the reset is instantaneous (D: the hardware's ≈5 µs reset is below one oversampled sample).
-- **Pulse:** `+1` for p < duty, else `−1` (both modes, D: the edge at the reset is high-going); `duty = 0.50 + 0.45·cv`, where cv = B3/127 (MANUAL), B3/127 × lfo (LFO; lfo is the bipolar triangle −1…+1, not delayed), B3/127 × env (ENV, 60 mode) (SN: 50 % at CV 0, 95 % at max). Band-limited at both edges. The pulse never disappears. (One source says the 106's slider physically reaches only byte 105; VJN6 uses the full 0–127 in both modes, D.)
+- **Pulse:** `+1` for p < duty, else `−1` (both modes, D: the edge at the reset is high-going); `duty = 0.50 + 0.45·cv`, where cv = B3/127 (MANUAL), B3/127 × lfo (LFO; lfo is the bipolar triangle −1…+1, not delayed), B3/127 × env (ENV, 60 mode) (SN: 50 % at CV 0, 95 % at max). Band-limited at both edges. The pulse never disappears. The Juno-60 has no separate square control; a square is the pulse at PWM 0 (MANUAL), and the sub is a square one octave down. (One source says the 106's slider physically reaches only byte 105; VJN6 uses the full 0–127 in both modes, D.)
 - **Sub:** square at f/2 toggling on each saw reset, so it is phase-locked to the saw; its initial state at prepare() is drawn from the variation generator (D). In 60 mode W3 = 0 switches it off.
 - **Noise:** one white generator at the host rate, fully correlated across voices (SN: one 2SC945 feeds all voices), upsampled into the voice path. No further band limit (D; a \~5 kHz limit is claimed by one source).
 - **Mix:** `x = saw·W2 + pulse·W1 + sub + noise`, then a 1-pole DC blocker at 0.35 Hz (CA: 10 µF into 44.9 kΩ on the 106; used for both modes, D).
@@ -487,7 +498,7 @@ Implemented as TPT/bilinear sections at the oversampled rate. The 60's corner de
 
 **R-E6 VCA.** `out = x_vcf · g(e) · (B10/127)`, e = envelope (ENV) or gate (GATE).
 
-- **60 mode:** g(e) = e (D: BA662 control current is linear in the ADSR voltage).
+- **60 mode:** g(e) = e (D: BA662 control current is linear in the ADSR voltage). The gain law of the LEVEL byte is linear too, `B10/127` (D: −5 = silent is assumed, §15.4). The Juno-60's LEVEL slider is centre-zero, marked −5…+5, so the panel shows v = byte/12.7 − 5 (R-P5) while the byte and the law stay as above: byte 0 = −5 (gain 0), byte 64 = 0 (gain 0.504, −6.0 dB), byte 127 = +5 (gain 1.0, the R-E2 reference).
 - **106 mode:** g(e) = e for e ≥ 0.1; g(e) = e · 10^(−1.3·(0.1 − e)/0.1) for e < 0.1 (CA: PNP converter; "26 dB per 10 % of envelope below 10 %"); g = 0 for e < 0.001.
 - **GATE:** g = a gate ramp that is 1 while the voice is held, else 0, moving linearly over 1.5 ms, computed per sample (D); in GATE mode neither the g(e) curve nor the 1 ms RC applies.
 
@@ -571,7 +582,7 @@ Sustain S = B13/127, linear.
 | Pitch bend | lever (R-E11) |
 | CC1 | ≥ 64: lever push (106) / LFO TRIG held (60); < 64 released |
 | CC3, 9 | LFO rate, LFO delay |
-| CC12 | Range: 0–42 16′, 43–85 8′, 86–127 4′ |
+| CC12 | Range: 0–42 16′, 43–85 8′, 86–127 4′ (in 60 mode it writes W0 with no audible effect, §4.1) |
 | CC13, 14 | DCO LFO, PWM |
 | CC15 | PWM source: 0–42 LFO, 43–85 MANUAL, 86–127 ENV (W5 = 2; read as MANUAL in 106 mode) |
 | CC16, 17, 28 | Pulse, saw, sub on (W3): ≥ 64 on |
@@ -621,6 +632,7 @@ A drag sends at most one message per parameter every 10 ms and always the final 
 
 | Control | v shown and typed | Engine value in the tooltip |
 | --- | --- | --- |
+| 60 VCA LEVEL | v = byte/12.7 − 5, one decimal, signed: `-5.0`…`+5.0` (`-5.0`, `0.0`, `+2.0`; 0 shows as `0.0`); typed −5.0…+5.0 commits round((v + 5) × 12.7), out-of-range values clamped | VCA LEVEL dB of the byte (byte 64 → `-6.0 dB`, byte 0 → `-inf dB`) |
 | Sliders | byte/12.7, one decimal, 0.0–10.0 | LFO RATE Hz; DELAY TIME s; DCO LFO ±cents; PWM duty % (MANUAL source) or ±% (LFO/ENV); NOISE and SUB level %; FREQ fc in Hz at note 60, env, LFO and lever 0, without c\_cal; RES k (two decimals); VCF ENV and LFO octaves; KYBD %; VCA LEVEL dB; A, D, R the slider time T in s; S % |
 | HPF | position 0–3 | the corner of the active mode (`flat`, `122 Hz`, `bass boost`) |
 | VOLUME knob | 0.0–10.0 | dB |
@@ -630,9 +642,9 @@ A drag sends at most one message per parameter every 10 ms and always the final 
 | PORTAMENTO TIME | 0.0–10.0 | s |
 | ARPEGGIO RATE | 0.0–10.0 | steps/s |
 
-Formats: times under 1 s in ms without decimals, others in s with two decimals; Hz with three significant digits; dB and cents with one decimal and a sign (gain 0 shows `-inf dB`); octaves with two decimals and a sign; % and k as integers / two decimals.
+Formats: times under 1 s in ms without decimals, others in s with two decimals; Hz with three significant digits; dB and cents with one decimal and a sign (gain 0 shows `-inf dB`); octaves with two decimals and a sign; % and k as integers / two decimals. In the formulas of the v3.2 corrections (60 VCA LEVEL, the factory bank of §15.3) round(x) = floor(x + 0.5); their arguments are never negative, so this equals the round-half-away-from-zero rule used elsewhere.
 
-**R-P6 Identical values.** The panel, the host value strings and the tooltips agree for the same byte.
+**R-P6 Identical values.** The panel, the host value strings and the tooltips agree for the same byte, within the active mode (the 60 VCA LEVEL string differs from the 106 one).
 
 **R-P7 Init patch.** The values used by empty slots: all sliders 0 except VCF FREQ 127, VCA LEVEL 127, SUSTAIN 127; range 8′, saw on, pulse off, sub on (60), chorus off, PWM LFO, polarity normal, VCA ENV, HPF 0 (flat in 60 mode, the default mode; the bass boost in 106 mode, where 1 is flat). Name `INIT`.
 
@@ -690,7 +702,7 @@ Keys 4–8 have no function. These keys are not panel input (glossary).
 
 ### 7.7 UI interaction
 
-**R-U1** Sliders and knobs: drag vertically (1 byte per 2 px, Ctrl/Cmd 1 byte per 8 px), wheel ±1 (Shift ±10), double-click to type (R-P5 scale; Enter commits as round(v × 12.7) or the cents value for TUNE, Esc reverts, out-of-range clamps, non-numbers revert). Hover shows the tooltip (R-P5) and never changes a value. Switches: click a position. Buttons: click. HPF slider (106): drag snaps to positions, typed 0–3. **Lever:** mouse-down anywhere on it starts a drag; horizontal movement sets the lever, full deflection at ±60 px from the mouse-down point; it springs back to centre on release (also when released outside the window, on blur and on editor close). In 106 mode a mouse-down in the lever's upper half also holds push until release; push does not change during the drag. The lever shows the last value from any source (mouse, keys, MIDI pitch bend); while the mouse drags it, incoming pitch bend is ignored.
+**R-U1** Sliders and knobs: drag vertically (1 byte per 2 px, Ctrl/Cmd 1 byte per 8 px), wheel ±1 (Shift ±10), double-click to type (R-P5 scale; Enter commits as round(v × 12.7), round((v + 5) × 12.7) for the 60 VCA LEVEL, or the cents value for TUNE, Esc reverts, out-of-range clamps, non-numbers revert). Hover shows the tooltip (R-P5) and never changes a value. Switches: click a position. Buttons: click. HPF slider (106): drag snaps to positions, typed 0–3. **Lever:** mouse-down anywhere on it starts a drag; horizontal movement sets the lever, full deflection at ±60 px from the mouse-down point; it springs back to centre on release (also when released outside the window, on blur and on editor close). In 106 mode a mouse-down in the lever's upper half also holds push until release; push does not change during the drag. The lever shows the last value from any source (mouse, keys, MIDI pitch bend); while the mouse drags it, incoming pitch bend is ignored.
 
 **R-U1a Keyboard on focused controls** (when keyboard play is off or the key is not in the §7.6 map): sliders and knobs Up/Right +1, Down/Left −1, with Shift ±10, Home/End min/max; switches Up/Down move one position; buttons Enter; the lever Left/Right deflect fully while held.
 
@@ -698,11 +710,11 @@ Keys 4–8 have no function. These keys are not panel input (glossary).
 
 **R-U3 Accessibility and contrast.**
 
-- Every control is reachable with Tab in visual order: the sections left to right, then the memory row, then the right edge; overlays in reading order.
+- Every control is reachable with Tab in visual order: the sections left to right, then the memory row, then the right edge; overlays in reading order. Inside a box the order is the §5.2 order of the active mode (60 VCF: FREQ, RES, polarity, ENV, LFO, KYBD; 60 chorus: OFF, I, II).
 - Every control has an ARIA name equal to its legend or label. The visible focus ring is 2 px `--legend`.
 - These text/background pairs reach at least 4.5:1: overlay text (`--legend` on `--overlay`) and tooltip text (`--legend` on `--tooltip`). Panel legends, button numbers and the LED are exempt as a hardware replica and keep their ARIA names. If a checked pair fails, the foreground token is adjusted by the smallest change that passes, and the change is recorded in `DECISIONS.md`.
 
-**R-U4 Combination press.** A Shift+click (keyboard: Shift+Enter) on a button while its partner is lit acts as pressing both. Partners are symmetric: BANK 1 ↔ BANK 5 (bank 6) and BANK 2 ↔ BANK 5 (bank 7) in 60 mode; POLY 1 ↔ POLY 2 (UNISON) in 106 mode. Repeating a combination that is already active does nothing. A Shift+click without a lit partner acts as a plain click. The tooltips of these buttons name the Shift+click.
+**R-U4 Combination press.** A Shift+click (keyboard: Shift+Enter) on a button while its partner is lit acts as pressing both. Partners are symmetric: BANK 1 ↔ BANK 5 (bank 6), BANK 2 ↔ BANK 5 (bank 7) and CHORUS I ↔ CHORUS II (I+II, W4 = 3) in 60 mode; POLY 1 ↔ POLY 2 (UNISON) in 106 mode. Repeating a combination that is already active does nothing. A Shift+click without a lit partner acts as a plain click. The tooltips of these buttons name the Shift+click.
 
 ### 7.8 Licensing and branding
 
@@ -722,14 +734,15 @@ Keys 4–8 have no function. These keys are not panel input (glossary).
 | pendragon-andyh/Juno60 analysis | MIT | Measurement data may be quoted in `docs/` with attribution; no code needed |
 | Holters & Parker 2018, Raffel & Smith 2010 | papers | Method and published constants; implementation is original |
 | thea.codes DCO article | CC-BY-SA text, Apache-2 code | Not copied; the DCO is written from R-E3 |
-| Roland service notes and manuals | Roland copyright | Numbers only; no scans, images or text in the repo |
-| Factory patch data ("The Original 128") | Roland | **Not shipped.** VJN6 ships its own default bank (§15.3) and imports `.syx` the user owns. |
+| Roland service notes and manuals | Roland copyright | Numbers only (and the Juno-60 sample-sound settings and patch names, next row); no scans, images or other text in the repo |
+| Juno-60 Owner's Manual sample-sound settings (pp. 24–28) | Roland | **Shipped** in the default bank (§15.3): the numeric settings and the patch names, with attribution in `docs/FACTORY_BANK.md` |
+| Juno-106 factory patch data ("The Original 128") | Roland | **Not shipped.** VJN6 imports any `.syx` the user owns. |
 
 **R-L3 Licence check (CI).** The build fails if any git-tracked first-party file contains the full title of the GNU GPL (the phrase "General Public License" preceded by "GNU") or of the GNU AGPL (the word "Affero" preceded by "GNU"). Excluded from the check: the JUCE submodule, `docs/` (including `docs/LICENSES.md`, which names licences), `SPEC.md` and `KICKOFF.md`.
 
 **R-L4 `docs/LICENSES.md`** lists every shipped component with its licence: JUCE (Starter), VST3 SDK (MIT), Svelte (MIT), the fonts (OFL); and the build and test tools separately.
 
-**R-L5 Branding.** "Roland", "JUNO", "Juno-60", "Juno-106" and Roland's logos never appear in the UI, the plugin metadata or the product name. Within `ui/src`, `plugin/` and the built plugin metadata they appear only in the bank manager's file-filter text "Juno-106 SysEx files (*.syx)" and in the rejection notice "Not a VJN6 or Juno-106 file". The mode badge reads **60** and **106**.
+**R-L5 Branding.** "Roland", "JUNO", "Juno-60", "Juno-106" and Roland's logos never appear in the UI, the plugin metadata or the product name. Within `ui/src`, `plugin/` and the built plugin metadata they appear only in the bank manager's file-filter text "Juno-106 SysEx files (*.syx)" and in the rejection notice "Not a VJN6 or Juno-106 file". The mode badge reads **60** and **106**. Patch names, including the default bank's, contain none of these marks; the factory bank's source JSON under `banks/` and its attribution in `docs/` may name the manual.
 
 ## 8. Edge cases
 
@@ -749,6 +762,7 @@ Keys 4–8 have no function. These keys are not panel input (glossary).
 | Chorus I+II patch loaded in 106 mode | Renders and displays as Chorus I; the stored field keeps 3. |
 | HPF position 0 patch moved between modes | 60 → 106: flat becomes bass boost; 106 → 60: boost becomes flat. Intended: the byte, not the sound, is preserved. Tooltip names the corner for the active mode. |
 | PWM ENV patch in 106 mode | Renders as MANUAL (D; hardware has no ENV source). |
+| Patch with 16′ or 4′ loaded in 60 mode | Plays at 8′; the stored W0 is kept and applies again in 106 mode. |
 | Received `F0 41 30` / `31` / `32` with wrong length | Ignored. |
 | SysEx parameter pp > 0x11 | Ignored. |
 | Program change in 106 mode with function I | Ignored (host programs still select, §4.8). |
@@ -772,7 +786,7 @@ Keys 4–8 have no function. These keys are not panel input (glossary).
 
 ### 9.1 Performance
 
-- **Native benchmark** (`tools/bench`): 106 mode, 6 voices in UNISON (worst case) of the default BRASS patch with Chorus I, 2× oversampling, 48 kHz, 10 s, on a GitHub `ubuntu-24.04` runner: render time < 8 % of real time, median of 5 runs. The tanh stages are the hot spot; a rational approximation with ≤ 1e−4 absolute error is allowed and must be the same function in native and WASM builds.
+- **Native benchmark** (`tools/bench`): 106 mode, 6 voices in UNISON (worst case) of the original `BRASS` patch (default-bank slot 58, selected by content; the factory `Brass` in slot 7 is a different patch) with Chorus I, 2× oversampling, 48 kHz, 10 s, on a GitHub `ubuntu-24.04` runner: render time < 8 % of real time, median of 5 runs. The tanh stages are the hot spot; a rational approximation with ≤ 1e−4 absolute error is allowed and must be the same function in native and WASM builds.
 - **WASM benchmark:** the same benchmark compiled with emcc, run in Node 22 on the same runner: < 35 % of real time.
 - **UI:** a change from any source is visible within 100 ms.
 
@@ -884,7 +898,7 @@ None. VJN6 uses no APIs, accounts or keys. Local platform services have defined 
 - The 60's HPF corner shift with VCA LEVEL (R-E4)
 - Chorus LFO-locked noise bursts and clicks at the clock extremes (R-E9 models the hiss only)
 - Velocity, aftertouch and MPE beyond the one Velocity → VCA setting; MIDI learn; mod matrix; second envelope or LFO; effects beyond the chorus
-- Factory patch data; localisation; touch layouts; layouts below 700 × 280
+- Juno-106 factory patch data (the Juno-60 sample sounds are the default bank, §15.3); localisation; touch layouts; layouts below 700 × 280
 - Microtuning
 - The Juno-60's KEY TRANSPOSE to any key (its octave switch is kept; key transpose exists in 106 mode)
 - The Juno-60's hidden banks 8–9 (Patch Shift jack) and external arpeggio clock jack
@@ -902,11 +916,11 @@ Every criterion is an automated test whose name contains its AC ID. Core criteri
 | --- | --- | --- | --- |
 | AC-E1.1 | Host rates 44.1, 48, 96 kHz; 2× and 4×; chorus off | An impulse is injected at the VCF input (filter at FREQ 127, RES 0, VCA gate forced open) | The output peak arrives `latencySamples()` ± 1 sample later; L/R identical |
 | AC-E1.2 | 106 mode, ENV A 127 | The envelope is sampled before the 1 ms RC | It changes value only at multiples of exactly 4.2 ms (fractional samples, ± 1 sample); after the RC it follows a 1 ms time constant ± 5 % |
-| AC-E1.3 (goldens) | 48 renders (8 default-bank patches × both modes × chorus off/I/II) at 48 kHz, note 60 held 1 s + 1 s released, variation 50 % | Rendered on all three OSes and WASM | Bit-identical to committed goldens; regenerated only with an intended change |
+| AC-E1.3 (goldens) | 48 renders (the 8 original default-bank patches, slots 58–65 selected by content, × both modes × chorus off/I/II) at 48 kHz, note 60 held 1 s + 1 s released, variation 50 % | Rendered on all three OSes and WASM | Bit-identical to committed goldens; regenerated only with an intended change |
 | AC-E1.4 | 48 kHz, latency read at 2× | Oversampling switched to 4× while a note sounds | Voices stop; `latencySamples()` changes to the 4× value and the plugin reports it to the host |
 | AC-E2.1 | Test patch, FREQ 127 | Peaks measured | Saw peak = 1.0 ± 1 % at the VCF input; engine output peak −24 dBFS ± 0.5 dB |
 | AC-E2.2 | Test patch, saw off, NOISE 127 | 10 s rendered | Host-rate noise source RMS = 0.11 ± 5 %; at the VCF input flat ± 1 dB from 100 Hz to 0.4 × host rate; identical in all six voices (correlation > 0.999) |
-| AC-E3.1 | Test patch, each range, notes 24, 60, 108 | Fundamental measured | 440 × 2^((n − 69)/12 + range/1200) ± 0.5 cent (60 mode); f\_clk / round(f\_clk / f) ± 0.1 cent (106 mode) |
+| AC-E3.1 | Test patch, each range (W0 = 0, 1, 2), notes 24, 60, 108 | Fundamental measured | 440 × 2^((n − 69)/12) ± 0.5 cent for every W0, i.e. the 8′ pitch (60 mode); f\_clk / round(f\_clk / f) ± 0.1 cent (106 mode) |
 | AC-E3.2 | 106 mode, 8′, note 69 | Bend swept −1 → +1 over 2 s with bender DCO sensitivity 127 | Pitch takes ≤ 255 distinct values; each change happens at a saw reset |
 | AC-E3.3 | Pulse only, PWM MANUAL at bytes 0, 64, 127 | Duty measured | 50.0 %, 72.7 %, 95.0 % ± 0.5 %; the high-going edge coincides with the saw reset |
 | AC-E3.4 | Pulse only, PWM LFO 127, LFO rate 0 | 1 LFO period | Duty sweeps 5 %–95 % as a triangle; the pulse never disappears |
@@ -971,11 +985,11 @@ All file and import criteria run with memory protect off unless stated.
 
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
-| AC-P1.1 | Every control, both modes | Moved | The §4.1/§4.2 field changes; the control is present only in its mode; 60 chorus I/II toggles give off/I/II/I+II |
+| AC-P1.1 | Every control, both modes | Moved | The §4.1/§4.2 field changes; the control is present only in its mode (60 mode: no RANGE control); the chorus OFF/I/II radio buttons give off/I/II, and in 60 mode the CHORUS I ↔ II combination press gives I+II; the 60 VCF controls are in the C-5 order |
 | AC-P2.1 | CLEAN | Each edit source; an unchanged-value host write; then Manual | EDITED; still CLEAN after the unchanged write (tested first); Manual clears it; a performance control does not set it |
 | AC-P4.1 | Every §5.3 state and priority combination, both modes | LED, decimal points and button LEDs read | Match a golden matrix derived by hand from §5.2 and §5.3 |
 | AC-P4.2 | An LED message showing | A panel input; a second message | The message is dismissed and the input acts; the new message replaces it and restarts 2 s |
-| AC-P5.1 | Every slider and knob at 0, 64, 127 | Panel, tooltip, host strings | Identical values; tooltip values equal the engine's, formatted per R-P5 |
+| AC-P5.1 | Every slider and knob at 0, 64, 127 | Panel, tooltip, host strings | Identical values; tooltip values equal the engine's, formatted per R-P5; 60 VCA LEVEL at bytes 0, 64, 127 shows `-5.0`, `0.0`, `+5.0` with `-inf dB`, `-6.0 dB`, `+0.0 dB` |
 | AC-P7.1 | — | An empty slot of the default bank is read | Bytes and name equal R-P7 |
 | AC-F1.1 | Standalone with saved state on slot 5; a corrupt `state.bin`; web | Start | Slot 5 shown, a MIDI note at the first render sounds; corrupt: `rE`, `state.bad` exists; web: the start card shows first, and its dismissing click activates nothing |
 | AC-F3.1 | EDITED on slot 3, 106 mode III | MANUAL | LED `--`, CLEAN, slot 3 still current, one `F0 41 31` sent |
@@ -1001,13 +1015,14 @@ All file and import criteria run with memory protect off unless stated.
 | AC-D4.2 | Edit-buffer names `BRASS 1`, an empty name, `___`, `con`; `.vjn6` files with `"vjn6": 2`, a missing key, 15 sliders, a float, a 20-character name, an extra key | Export patch; import | `BRASS 1.vjn6`, `patch.vjn6`, `patch.vjn6`, `con_.vjn6`; `Er`, `Er`, `Er`, `Er`, name truncated to 12, extra key ignored |
 | AC-D6.1 | Empty storage | Start | The R-D6 state, including the §4.2 defaults |
 | AC-D7.1 | The default bank | Slots 1–9 play note 60 in both modes | Peak > −60 dBFS; names as §15.3 |
+| AC-D7.2 | The generated default bank | Compared with the §15.3 factory byte table | Slots 1–56 equal it byte for byte and name for name; slot 57 equals INIT; slots 58–65 equal the eight original patches |
 
 ### 13.4 Plugin, UI, keyboard, licensing, build, performance
 
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
 | AC-PL1 | VST3 on macOS, Windows, Linux (xvfb); AU on macOS | pluginval at strictness 5 | Pass |
-| AC-PL2 | Plugin | Parameters and programs enumerated; a slot renamed | 40 parameters with §4.8 IDs, order, names and strings; 128 programs named after the slots; the rename updates the program name |
+| AC-PL2 | Plugin | Parameters and programs enumerated; a slot renamed; the mode switched | 40 parameters with §4.8 IDs, order, names and strings (`f_oct_transpose` `D`, `N`, `U`; `p_vca_level` following the active mode); 128 programs named after the slots; the rename updates the program name |
 | AC-PL3 | `getStateInformation` during playback → `setStateInformation` into a new instance; then `setCurrentProgram` with the current slot while EDITED | Compared | Identical state; every `render()` call under 50 % of its block's real-time duration; the EDITED buffer is kept |
 | AC-S1.1 | Every patch field at random values (seed 1) drawn from the values all five paths can express (sliders 0–127; switches in their 106 range) | Set via command, panel, SysEx, CC, host (plugin-side native test with the real `AudioProcessor`) | Identical core state, one event per change |
 | AC-S2.1 | Manual with WRITE armed; separately, 106 mode with key transpose armed | Host automation, `F0 41 32`, CC | Slot, Manual and the arming unchanged; EDITED; nothing transmitted |
@@ -1017,10 +1032,10 @@ All file and import criteria run with memory protect off unless stated.
 | AC-K1.1 | Play on | Each mapped key | The R-K1 note, octave, velocity, hold pedal, lever or push effect occurs; keys 4–8 do nothing |
 | AC-K2.1 | Play on | Key repeat; octave change while held; blur; text focus; play toggled off; Ctrl+A; `isComposing`; Tab; Space; a play key while WRITE is armed | No repeat note-on; the original note is released; all released; all released; all released; no note; no note; focus moves; hold pedal (and Enter activates the focused control); WRITE stays armed |
 | AC-K2.2 | The plugin build | First open | Play is off; M turns it on |
-| AC-U1.1 | Sliders, knobs, TUNE, HPF (106), switches, lever | Drag 20 px, Ctrl-drag 20 px, wheel, Shift-wheel, typing 12 / abc; TUNE typed 10; HPF typed 2; switch position click; lever drag 30 px, release outside, upper-half press; a focused slider with Up, Shift+Up, End | +10, +2–3, +1, +10, clamp 127 / revert; tune byte 77 (+10.2 cents); HPF 2; the switch field; lever +0.5, back to 0, push held; +1, +10, 127 |
+| AC-U1.1 | Sliders, knobs, TUNE, HPF (106), switches, lever | Drag 20 px, Ctrl-drag 20 px, wheel, Shift-wheel, typing 12 / abc; TUNE typed 10; HPF typed 2; switch position click; lever drag 30 px, release outside, upper-half press; a focused slider with Up, Shift+Up, End | +10, +2–3, +1, +10, clamp 127 / revert; tune byte 77 (+10.2 cents); HPF 2; the switch field; lever +0.5, back to 0, push held; +1, +10, 127; 60 VCA LEVEL typed `-2` → byte 38, `+5` → 127, `9` → 127 (clamped) |
 | AC-U2.1 | — | Each R-U2 shortcut | Its action occurs and no note sounds |
 | AC-U3.1 | Both skins | Tab from the first control to the last; axe-core; contrast script over `theme.css` | Every control receives focus once in R-U3 order with a visible ring; no missing names; R-U3 pairs ≥ 4.5:1 |
-| AC-U4.1 | 106 mode, POLY 1 lit | Shift+click POLY 2; Shift+click POLY 1; click POLY 1 | UNISON, both lit; unchanged; POLY 1 |
+| AC-U4.1 | 106 mode, POLY 1 lit; 60 mode, CHORUS II lit | Shift+click POLY 2; Shift+click POLY 1; click POLY 1 / Shift+click CHORUS I; Shift+click CHORUS I; click CHORUS I | UNISON, both lit; unchanged; POLY 1 / W4 = 3 with I and II lit; unchanged; W4 = 1 |
 | AC-SC1 | Chromium on Linux | Screenshots at 50/100/200 % in both modes, bank manager, settings | ≤ 0.1 % pixel difference from committed baselines (generated by the implementer) |
 | AC-SC2 | Web | Before the gesture; served without COOP/COEP; `requestMIDIAccess` rejected; granted without SysEx | The start card shows; the isolation message shows; Settings shows "MIDI not available — use the computer keyboard."; Settings shows "SysEx not permitted — SysEx disabled." and Send patch is disabled |
 | AC-SC3 | `ui/dist` | Inspected | No png/jpg/gif/webp/bmp files and no `data:image/` raster URIs |
@@ -1043,7 +1058,7 @@ All file and import criteria run with memory protect off unless stated.
 | R-U1, R-U1a, R-U2–U4 | AC-U1.1–U4.1 |
 | R-L1 – R-L5 | AC-L1.1 (R-L1, R-L3), AC-L2.1, AC-L4.1, AC-L5.1 |
 | F-1 – F-13 | AC-F1.1, P2.1 (F-2), F3.1, F4.x, F5.x, F5.1 + D4.1 (F-6), F7.1, F8.1 + E11.5, E11.3 (F-9), F10.1, F11.x, F12.1, F13.1 |
-| §4.8, §5, §9.1–9.3, §15.1–15.3 | AC-PL1–PL3, AC-SC1–SC3 + AC-P4.x, AC-N1.1, AC-B1/B2, AC-D7.1 |
+| §4.8, §5, §9.1–9.3, §15.1–15.3 | AC-PL1–PL3, AC-SC1–SC3 + AC-P4.x, AC-N1.1, AC-B1/B2, AC-D7.1, AC-D7.2 |
 
 ## 14. Implementer's latitude
 
@@ -1096,15 +1111,89 @@ The README documents configure, build and test for desktop with CMake ≥ 3.25 (
 
 ### 15.3 Default bank
 
-`banks/vjn6-default.vjn6bank` is generated by `tools/make_default_bank.py` from readable JSON in `banks/default/*.json`:
+`banks/vjn6-default.vjn6bank` (and the copy compiled into the core) is generated by `tools/make_default_bank.py` from `banks/j60-factory-chart.csv` (the Juno-60 Owner's Manual sample-sound charts, pp. 25–28, as printed) and the readable JSON in `banks/default/*.json`:
 
-| Slot | Content |
+| Slots | Content |
 | --- | --- |
-| 1 | `INIT` (R-P7) |
-| 2–9 | Eight original patches: `BRASS`, `STRINGS`, `PAD`, `BASS`, `PLUCK`, `ORGAN`, `SWEEP`, `SFX` — written for 60 mode and checked to sound (AC-D7.1) in 106 mode |
-| 10–128 | `INIT` |
+| 1–56 | the 56 Juno-60 factory patches in manual order: slot = (bank − 1) × 8 + patch, so the 60-mode LED `11`…`78` matches the manual's number |
+| 57 | `INIT` (R-P7) |
+| 58–65 | the eight original patches, unchanged bytes and names, in this order: `BRASS`, `STRINGS`, `PAD`, `BASS`, `PLUCK`, `ORGAN`, `SWEEP`, `SFX` — written for 60 mode and checked to sound (AC-D7.1) in 106 mode |
+| 66–128 | `INIT` |
 
-No Roland factory data is included (R-L2). The bank manager imports any `.syx` the user owns.
+First run (R-D6) is therefore slot 1 = `Strings 1`. No Juno-106 factory data is included (R-L2); the bank manager imports any `.syx` the user owns. Attribution, the manual's full patch names, each patch's chart performance settings, and the notes below are in `docs/FACTORY_BANK.md`.
+
+**Chart → patch mapping** (round(x) = floor(x + 0.5), R-P5; every chart value round-trips through byte → display → byte exactly):
+
+- 0–10 sliders: byte = round(v × 12.7): B0 rate, B1 delay, B2 DCO LFO, B3 PWM, B4 noise, B5 FREQ, B6 RES, B7 ENV, B8 VCF LFO, B9 KYBD, B11–B14 A D S R, B15 SUB OSC level.
+- B10 VCA LEVEL (−5…+5): byte = round((v + 5) × 12.7).
+- W1, W2, W3: pulse, saw, sub (1 = `*` in the chart). W4 chorus: OFF 0, I 1, II 2 (`II?` → 2, patch 36 below). W5 PWM mode: L 0, M 1, E 2. W6 polarity: N 0, I 1. W7 VCA: E 0, G 1. W8 HPF: the chart value 0–3.
+- **W0 encodes the chart's octave transpose:** D → 0 (16′), N → 1 (8′), U → 2 (4′). 60 mode ignores W0 (§4.1), so the 60 sound is unaffected; 106 mode plays each patch in its intended octave.
+- Knob positions the manual calls irrelevant to the sound (for example SUB OSC level with the sub button off) are kept as charted. In 106 mode those patches play the sub at that level, because 106 mode reads W3 = 1; that is accepted.
+- **Not stored per patch:** the charts' OCTAVE TRANSPOSE and LFO TRIG MODE stay performance settings (§4.2). They are kept in the source JSON (`chart_performance`) and listed in `docs/FACTORY_BANK.md`, so a player can set the switches (§15.4). Patches 21, 33, 51, 52, 54 and 57 use MANUAL trigger with DCO vibrato; in AUTO they get constant vibrato after the delay.
+- **Patch 36** (Pizzicato Sound 2): chorus II is inferred; the scan's right edge on p. 26 is cut off, and OFF and I are both blank (§15.4).
+- **Bank 7** uses no DCO waveform: 71–76 and 78 are VCF self-oscillation at RES 10, pitched by FREQ, as the manual says; 77 (Surf) is a noise patch at RES 0; 71, 73, 75 and 76 also add noise (§15.4).
+- Names: the 12-character names in the table below, with no Roland or Juno marks (R-L5). The manual's full names are in the source JSON's `manual_name` and in `docs/FACTORY_BANK.md`.
+
+**Factory byte table (AC-D7.2).** Columns: slot, manual patch number, VJN6 name, B0–B15 in §4.1 order, W0–W8, then the chart's performance settings, which are not stored.
+
+| Slot | J60 | Name | B0–B15 | range pulse saw sub chorus pwm_src pol vca hpf | Oct | Trig |
+|---|---|---|---|---|---|---|
+| 1 | 11 | Strings 1 | 76 0 0 0 0 89 0 0 0 127 64 51 0 127 57 0 | 1 0 1 0 1 0 0 0 0 | N | A |
+| 2 | 12 | Strings 2 | 51 0 0 76 0 89 0 0 0 127 38 51 0 127 57 0 | 1 1 1 0 2 0 0 0 0 | N | A |
+| 3 | 13 | Strings 3 | 38 102 0 89 0 64 0 0 0 127 38 38 0 127 76 127 | 1 1 1 1 2 0 0 0 0 | N | M |
+| 4 | 14 | Organ 1 | 25 102 0 64 0 51 76 57 0 127 64 0 0 0 0 127 | 1 1 0 1 1 1 0 1 0 | N | A |
+| 5 | 15 | Organ 2 | 64 51 0 70 0 44 70 51 0 127 64 0 13 0 13 102 | 1 1 0 1 1 0 0 1 0 | N | A |
+| 6 | 16 | Organ 3 | 64 51 0 70 0 44 70 44 0 127 64 0 13 0 13 102 | 2 1 0 1 2 0 0 1 0 | U | A |
+| 7 | 17 | Brass | 64 83 19 0 0 0 0 108 0 51 89 32 51 76 25 0 | 1 0 1 0 1 1 0 0 0 | N | A |
+| 8 | 18 | Phase Brass | 76 0 0 127 0 38 13 70 0 127 51 25 51 51 38 127 | 1 1 1 0 1 2 0 1 0 | N | A |
+| 9 | 21 | Piano 1 | 76 38 57 76 0 13 0 89 0 51 89 0 102 19 38 0 | 1 1 0 0 0 1 0 0 0 | N | M |
+| 10 | 22 | Piano 2 | 51 0 0 51 0 44 0 32 25 102 102 0 95 0 44 57 | 2 1 0 1 0 1 0 0 0 | U | A |
+| 11 | 23 | Celesta | 44 76 0 64 0 44 102 0 0 127 76 0 83 25 70 127 | 1 1 1 0 0 2 0 0 1 | N | A |
+| 12 | 24 | Mellow Piano | 64 0 0 64 0 38 0 32 13 114 89 13 95 25 108 127 | 1 1 0 0 1 1 0 0 0 | N | M |
+| 13 | 25 | Harpsichd 1 | 64 51 0 38 0 38 0 64 0 89 51 0 76 44 32 89 | 2 1 0 1 1 1 0 0 1 | U | A |
+| 14 | 26 | Harpsichd 2 | 70 76 0 25 0 64 32 38 0 127 64 0 64 19 64 108 | 2 1 0 1 2 1 0 0 1 | U | A |
+| 15 | 27 | Guitar | 76 76 0 76 0 38 0 57 19 64 114 0 70 44 83 127 | 1 1 0 0 0 1 0 0 2 | N | A |
+| 16 | 28 | Synth Harp | 38 102 0 0 0 38 0 64 0 102 76 0 70 38 64 127 | 1 0 1 0 1 1 0 0 0 | N | M |
+| 17 | 31 | Bass 1 | 64 76 0 64 0 38 32 44 0 0 64 0 51 13 32 38 | 0 1 1 1 1 1 0 1 0 | D | A |
+| 18 | 32 | Bass 2 | 64 76 0 64 0 38 64 57 0 64 51 0 38 44 32 38 | 0 1 1 0 1 1 0 1 0 | D | A |
+| 19 | 33 | Clavichord 1 | 76 32 51 102 0 0 38 102 0 76 89 0 64 44 19 0 | 0 1 0 0 1 1 0 0 0 | D | M |
+| 20 | 34 | Clavichord 2 | 13 0 0 102 0 70 89 25 32 89 127 0 57 25 25 127 | 0 1 0 0 0 1 0 0 1 | D | A |
+| 21 | 35 | Pizzicato 1 | 64 76 0 44 0 57 38 38 38 127 102 0 25 44 70 38 | 1 1 0 0 1 1 0 0 0 | N | A |
+| 22 | 36 | Pizzicato 2 | 64 76 0 25 0 64 38 38 0 127 76 0 38 38 51 38 | 2 1 0 1 2 1 0 0 0 | U | A |
+| 23 | 37 | Xylophone | 64 0 0 64 0 51 64 38 0 76 127 0 44 0 44 127 | 2 0 0 1 0 1 0 0 1 | U | A |
+| 24 | 38 | Glockenspiel | 64 0 0 0 0 57 64 38 0 76 114 0 38 32 64 0 | 2 1 0 0 0 1 0 0 1 | U | A |
+| 25 | 41 | Violine | 76 76 25 0 0 83 0 0 0 127 89 51 0 127 51 0 | 1 0 1 0 0 0 0 0 1 | N | A |
+| 26 | 42 | Trumpet | 32 83 19 0 0 0 0 108 0 51 89 32 51 76 25 0 | 1 0 1 0 0 1 0 0 0 | N | A |
+| 27 | 43 | Horn | 32 89 0 0 0 25 0 70 25 51 89 51 64 76 38 0 | 1 0 1 0 0 1 0 0 0 | N | A |
+| 28 | 44 | Tuba | 32 89 19 0 0 19 0 76 0 51 127 38 51 51 38 0 | 0 0 1 0 0 1 0 0 0 | D | A |
+| 29 | 45 | Flute | 70 64 0 0 19 64 0 0 25 76 127 25 76 64 32 0 | 2 0 1 0 0 1 0 0 1 | U | A |
+| 30 | 46 | Clarinet | 64 83 19 0 0 64 38 32 0 76 76 32 76 76 32 0 | 1 1 0 0 0 1 0 0 1 | N | A |
+| 31 | 47 | Oboe | 70 83 19 83 0 57 64 32 0 64 127 25 76 76 32 0 | 1 1 0 0 0 1 0 0 3 | N | A |
+| 32 | 48 | English Horn | 64 89 25 83 0 64 89 0 19 64 127 25 76 76 32 0 | 0 1 0 0 0 1 0 0 3 | D | A |
+| 33 | 51 | Funny Cat | 76 25 38 0 0 19 95 64 25 64 102 32 51 127 13 0 | 1 0 1 0 0 1 0 0 1 | N | M |
+| 34 | 52 | Wah Brass | 76 25 38 0 0 38 89 57 0 76 89 38 38 51 25 0 | 1 0 1 0 0 1 0 1 0 | N | M |
+| 35 | 53 | Phase Combi | 76 25 0 102 0 76 25 38 0 25 38 0 89 25 25 0 | 1 1 1 0 1 1 0 0 0 | N | M |
+| 36 | 54 | Reed 1 | 76 25 51 0 0 13 76 89 0 64 76 0 108 64 13 0 | 1 1 0 0 1 1 0 1 0 | N | M |
+| 37 | 55 | Popcorn | 0 0 0 0 0 32 25 70 0 127 102 0 38 25 0 127 | 2 0 0 1 0 1 0 0 1 | U | A |
+| 38 | 56 | Reed 2 | 38 102 0 0 0 25 0 76 0 102 64 0 70 38 76 127 | 2 0 0 1 1 1 0 0 0 | U | M |
+| 39 | 57 | Reed 3 | 76 25 25 64 0 38 25 38 0 127 76 32 0 127 25 127 | 2 0 0 1 0 1 0 0 0 | U | M |
+| 40 | 58 | PWM Chorus | 38 0 0 64 0 102 0 0 0 127 25 38 0 127 51 127 | 1 1 0 1 2 0 0 0 0 | N | M |
+| 41 | 61 | Synth Organ | 57 76 0 83 0 32 0 64 25 89 64 0 25 64 32 95 | 1 1 0 1 2 1 0 1 0 | N | A |
+| 42 | 62 | Effect 1 | 57 76 19 127 0 83 0 57 0 89 89 0 64 0 70 89 | 2 1 1 1 1 1 1 0 0 | U | A |
+| 43 | 63 | Effect 2 | 70 114 0 38 0 83 38 51 0 13 51 83 70 25 83 83 | 1 0 1 1 1 0 1 1 0 | N | A |
+| 44 | 64 | Space Harp | 70 0 25 0 0 83 64 70 0 127 76 0 102 102 114 0 | 1 0 1 0 1 2 0 0 0 | N | A |
+| 45 | 65 | Funk | 38 32 0 76 0 95 76 64 0 57 25 76 64 0 0 127 | 1 1 1 1 1 1 1 1 0 | N | A |
+| 46 | 66 | Space 1 | 76 89 25 57 0 83 89 70 0 127 38 0 102 0 38 127 | 1 1 0 1 1 1 1 1 0 | N | A |
+| 47 | 67 | Mysterious | 76 102 25 102 0 102 89 76 32 0 64 0 127 0 127 127 | 1 1 1 0 0 2 1 0 0 | N | A |
+| 48 | 68 | Space 2 | 38 38 0 76 0 25 108 76 0 127 25 127 127 127 127 102 | 1 1 1 0 1 1 0 0 0 | N | A |
+| 49 | 71 | Percussive 1 | 0 0 0 0 127 51 127 19 0 127 127 0 38 0 51 0 | 2 0 0 0 0 2 0 0 1 | U | A |
+| 50 | 72 | Percussive 2 | 0 0 0 0 0 64 127 44 0 127 127 0 38 0 51 0 | 1 0 0 0 0 2 1 0 1 | N | A |
+| 51 | 73 | Whistle | 70 64 0 0 25 44 127 19 25 127 102 38 0 127 13 0 | 2 0 0 0 0 1 0 0 1 | U | A |
+| 52 | 74 | Effect 3 | 70 51 0 0 0 44 127 0 25 127 127 0 51 70 89 0 | 1 0 0 0 0 2 0 0 1 | N | A |
+| 53 | 75 | UFO | 76 0 0 0 25 0 127 89 51 127 51 0 76 127 102 0 | 2 0 0 0 1 1 0 0 0 | U | A |
+| 54 | 76 | Space 3 | 76 0 0 0 25 64 127 51 0 127 64 0 127 0 102 0 | 2 0 0 0 1 1 1 0 0 | U | A |
+| 55 | 77 | Surf | 0 0 0 0 127 76 0 0 76 127 114 0 51 127 102 127 | 1 0 0 0 0 2 0 0 0 | N | A |
+| 56 | 78 | Synth Drum | 0 0 0 0 0 25 127 51 0 127 76 0 64 0 76 0 | 1 0 0 0 0 2 0 0 0 | N | M |
 
 ### 15.4 Human follow-ups (not agent acceptance)
 
@@ -1129,6 +1218,10 @@ Each row is a (D) or single-source constant, or something CI cannot check. The m
 | POLY 2 stealing, portamento range and curve | rotary-release-first; 3 s × square (one emulator uses cube) | Scripted note patterns; glide timing |
 | Arpeggio gate length | 50 % | Arpeggio at rate 0, VCA GATE; gate width |
 | HPF corner dependence on VCA LEVEL (60) | not modelled | HPF sweeps at VCA 25 / 127 |
+| 60 VCA LEVEL law | linear `B10/127`, −5 = silent assumed (R-E6) | Saw at VCA LEVEL −5, 0, +5; measure the gain at each |
+| LFO TRIG MODE and octave transpose per patch (60) | performance settings (§4.2), not stored in a patch | Does the Juno-60 store LFO TRIG MODE (and octave transpose) in a patch? If it does, move it into the patch (affects factory patches 21, 33, 51, 52, 54, 57, §15.3) |
+| Factory patch 36 chorus | chorus II inferred (the scan's right edge on p. 26 is cut off) | A clean copy of the manual's p. 26, or the patch recalled on a Juno-60 |
+| Factory bank 7 tuning | FREQ as charted | Bank 7 (71–76, 78) sounds by VCF self-oscillation, so its pitch depends on each unit's filter calibration; the manual says to tune these patches with FREQ. Compare the pitch of each on a Juno-60 |
 | Panel colours and typeface | tokens in §11 | Licensed photos, visual judgement |
 | Real devices and browsers | — | Safari, Web MIDI devices, audio devices in the standalone, Firefox (CI has none) |
 | Signed / notarised installers | — | Apple Developer ID / Windows signing credentials |
@@ -1141,5 +1234,6 @@ Each row is a (D) or single-source constant, or something CI cannot check. The m
 - **Circuit analysis (tier 2):** Electric Druid "Roland Juno DCOs" and "IR3109"; AS3109 datasheet (Erica Synths); sequence15 Juno-106 DCO and HPF analyses; atosynth filter/VCA/resonance posts; Obsolete Technology 80017a teardown; AMSynths IR3109; Soundforce (schematic-derived clone); thea.codes "The design of the Juno DCO"; fm1juno Juno-106 chorus schematic transcription; Ultramaster KR-106 documentation and source (GPL-3, numbers only); Juno-106 firmware partial disassembly (r/synthdiy); Tubbutec Juno-66 manuals.
 - **Measurements and models (tier 2–3):** Holters & Parker, "A Combined Model for a Bucket Brigade Device and its Input and Output Filters", DAFx-18; Raffel & Smith, "Practical Modeling of Bucket-Brigade Device Circuits", DAFx-10; pendragon-andyh/Juno60 chorus analysis (MIT) and junox (GPL-3); KR-106 chorus, HPF, noise and ADSR measurements; GroupDIY Juno-60 chorus LFO thread; florian-anwander.de Roland string choruses.
 - **MIDI/SysEx:** Juno-106 owner's manual MIDI chart; ST-Log issue 33 (1989); MIDIbox Juno-106 translator; MIDI Kinetics; KR-106 SysEx decoder; Roland JU-06A MIDI implementation chart (CC map); Wikipedia "Digital Control Bus".
+- **Juno-60 Owner's Manual** (Roland): panel diagram, pp. 12–24 (DCO, VCF, VCA, chorus, controller), p. 32 (specifications), pp. 24–28 (sample-sound names and settings, shipped as the default bank, §15.3).
 - **Panel:** Roland spec pages; E&MM Jul and Dec 1982, One Two Testing 1982, E&MM Aug 1984 (muzines.co.uk / worldradiohistory.com); taraswolf.com design review; polynominal.com.
 - **Toolchain and licences:** JUCE 9 EULA and CMake API; VST3 SDK (MIT); Pamplejuce; pluginval; Emscripten Wasm Audio Worklets; MDN `KeyboardEvent.code`.
