@@ -4,7 +4,7 @@
 # requests into main and on a deliberate manual dispatch. It never runs on pushes to development branches
 # or on pull requests into develop/** or epic/**; per-ticket verification uses the local gates (README).
 # After a merge to main only the smoke workflow (smoke.yml) runs. Pushes to an open PR into main re-run
-# this workflow, so batch fixes into one push.
+# this workflow, so batch fixes into one push. Packaging and signing live in release.yml (started by hand).
 name: CI
 
 on:
@@ -67,16 +67,6 @@ jobs:
           - name: Ubuntu 24.04 (webkit2gtk-4.1; Standalone, VST3)
             os: ubuntu-24.04
     env:
-      # Signing and notarisation run only when these secrets exist (§15.1, §15.4).
-      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-      WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
       ARTEFACTS: build/plugin/VJN6_artefacts/Release
     steps:
       - uses: actions/checkout@v4
@@ -222,70 +212,6 @@ jobs:
           diff -u tests/golden/display_table.json "$RUNNER_TEMP/display_table.json"
           # Building and testing must not rewrite tracked files (goldens change only with an intended change).
           git diff --exit-code --stat
-
-      - name: Sign (macOS, Developer ID; skipped without secrets)
-        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != ''
-        run: |
-          keychain="$RUNNER_TEMP/vjn6-signing.keychain-db"
-          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
-          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/cert.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$keychain"
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          code="$(dirname "$ARTEFACTS")/JuceLibraryCode"
-          for pair in "Standalone/VJN6.app:VJN6_Standalone" "VST3/VJN6.vst3:VJN6_VST3" "AU/VJN6.component:VJN6_AU"; do
-            bundle="$ARTEFACTS/${pair%%:*}"
-            ent="$code/${pair##*:}.entitlements"
-            extra=()
-            [ -f "$ent" ] && extra=(--entitlements "$ent")
-            codesign --force --timestamp --options runtime "${extra[@]}" --sign "$MACOS_SIGNING_IDENTITY" "$bundle"
-            codesign --verify --strict --verbose=2 "$bundle"
-          done
-
-      - name: Notarise and staple (macOS; skipped without secrets)
-        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != '' && env.APPLE_ID != ''
-        run: |
-          for b in Standalone/VJN6.app VST3/VJN6.vst3 AU/VJN6.component; do
-            bundle="$ARTEFACTS/$b"
-            zip="$RUNNER_TEMP/$(basename "$bundle").zip"
-            ditto -c -k --keepParent "$bundle" "$zip"
-            xcrun notarytool submit "$zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
-              --password "$APPLE_APP_PASSWORD" --wait
-            xcrun stapler staple "$bundle"
-          done
-
-      - name: Sign (Windows, Authenticode; skipped without secrets)
-        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_PFX != ''
-        shell: pwsh
-        run: |
-          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX))
-          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1
-          $files = @(
-            (Join-Path $env:ARTEFACTS 'Standalone\VJN6.exe'),
-            (Join-Path $env:ARTEFACTS 'VST3\VJN6.vst3\Contents\x86_64-win\VJN6.vst3'))
-          foreach ($f in $files) {
-            & $signtool.FullName sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 `
-              /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD $f
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          Remove-Item $pfx
-
-      - name: Upload signed builds (only when signed)
-        if: (runner.os == 'macOS' && env.MACOS_CERTIFICATE_P12 != '') || (runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_PFX != '')
-        uses: actions/upload-artifact@v4
-        with:
-          name: VJN6-${{ runner.os }}
-          path: |
-            ${{ env.ARTEFACTS }}/Standalone
-            ${{ env.ARTEFACTS }}/VST3
-            ${{ env.ARTEFACTS }}/AU
-          retention-days: 14
-          if-no-files-found: ignore
 
   wasm:
     name: wasm (emsdk) and web (Vitest, Playwright Chromium + WebKit)

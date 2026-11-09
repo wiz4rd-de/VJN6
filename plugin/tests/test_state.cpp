@@ -2,13 +2,63 @@
 // AC-E1.4 plugin part, AC-M1.1 plugin part, the fallback driver.
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <thread>
 
 #include "helpers.h"
 
+// After the JUCE headers, and without GDI, so no Windows macro meets JUCE's names.
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOGDI
+#define NOGDI
+#endif
+#include <windows.h>  // QueryThreadCycleTime
+#else
+#include <time.h>  // clock_gettime(CLOCK_THREAD_CPUTIME_ID)
+#endif
+
 using namespace vjn6test;
+
+namespace {
+// CPU time the calling thread has used, in seconds (AC-PL3, DECISIONS.md "Plugin and standalone"). Unlike
+// wall time it leaves out the time the OS keeps the thread off the CPU, which on a loaded machine (a shared
+// CI runner) says nothing about the plugin. Same method as VDX's AC-PL3 (its D-PL20).
+double threadCpuSeconds() {
+#if defined(_WIN32)
+  // GetThreadTimes advances only once per scheduler tick (~15.6 ms, more than a block's budget). The
+  // thread's cycle count is exact; its rate is measured once per thread. Preemption during the measurement
+  // can only lower the rate, so the highest of three is kept.
+  static thread_local double cyclesPerSecond = 0;
+  if (cyclesPerSecond == 0) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      ULONG64 c0 = 0, c1 = 0;
+      QueryThreadCycleTime(GetCurrentThread(), &c0);
+      const auto t0 = std::chrono::steady_clock::now();
+      while (std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(20)) {
+      }
+      QueryThreadCycleTime(GetCurrentThread(), &c1);
+      const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      cyclesPerSecond = std::max(cyclesPerSecond, static_cast<double>(c1 - c0) / s);
+    }
+  }
+  ULONG64 c = 0;
+  QueryThreadCycleTime(GetCurrentThread(), &c);
+  return static_cast<double>(c) / cyclesPerSecond;
+#else
+  timespec ts{};
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+  return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9;
+#endif
+}
+}  // namespace
 
 TEST_CASE("AC-PL3 state saved during playback restores into a new instance; renders stay under 50 % of real time",
           "[AC-PL3]") {
@@ -44,23 +94,31 @@ TEST_CASE("AC-PL3 state saved during playback restores into a new instance; rend
     }
   });
 
+  // A block's cost is its CPU time on the audio (here: test) thread; wall time is reported alongside,
+  // because a busy machine can preempt the thread for longer than a block without any work or waiting in
+  // the plugin. processBlock takes no lock and allocates nothing (AC-E13.2), so CPU time is its whole cost.
   const double blockSeconds = kBlock / kFs;
-  double worst = 0.0;
+  double worst = 0.0, worstWall = 0.0;
   juce::MidiBuffer chord;
   for (int n : {48, 55, 60, 64, 67, 72}) {
     const uint8_t on[3] = {0x90, static_cast<uint8_t>(n), 100};
     chord.addEvent(on, 3, 0);
   }
+  threadCpuSeconds();  // Windows: measures the cycle rate before the first timed block
   for (int b = 0; b < 600; ++b) {
+    const double c0 = threadCpuSeconds();
     const auto t0 = std::chrono::steady_clock::now();
     ha.process(b == 0 ? chord : juce::MidiBuffer());
-    const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    if (dt > worst) worst = dt;
+    const double cpu = threadCpuSeconds() - c0;
+    const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    worst = std::max(worst, cpu);
+    worstWall = std::max(worstWall, wall);
   }
   stop = true;
   saver.join();
   REQUIRE(saves.load() > 10);
-  INFO("worst render " << worst * 1000.0 << " ms of " << blockSeconds * 1000.0 << " ms");
+  INFO("worst render " << worst * 1000.0 << " ms CPU (" << worstWall * 1000.0 << " ms wall) of "
+                       << blockSeconds * 1000.0 << " ms");
   CHECK(worst < 0.5 * blockSeconds);
   CHECK(ha.process() > 1e-4);  // still playing
 

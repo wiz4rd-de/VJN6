@@ -8,6 +8,27 @@ three builds from one C++ engine (`vjn6_core`) and one Svelte UI: a standalone d
 instrument plugin (JUCE 9) and a locally hosted web page (WebAssembly AudioWorklet). SPEC.md is the
 product specification; DECISIONS.md records the implementation choices.
 
+## Install a release
+
+[GitHub Releases](https://github.com/wiz4rd-de/VJN6/releases) has packages for macOS, Windows and Linux.
+They are **not code-signed**, so the operating system warns the first time.
+
+- **macOS 13 or later (Apple silicon and Intel):** open `VJN6-<version>-macOS.pkg`. macOS refuses it the
+  first time: open System Settings → Privacy & Security, click "Open Anyway" next to the message about the
+  package, and confirm. It puts `VJN6.app` into /Applications and the VST3 and AU plugins into
+  /Library/Audio/Plug-Ins; "Customize" lets you leave parts out.
+- **Windows 10 22H2 or later / Windows 11 (x64):** run `VJN6-<version>-Windows-x64-Setup.exe`. If
+  SmartScreen says "Windows protected your PC", choose "More info", then "Run anyway". It puts the app into
+  Program Files\VJN6 and the VST3 plugin into Common Files\VST3. The zip holds the same files to copy by
+  hand. The interface needs the Microsoft Edge WebView2 Runtime: Windows 11 includes it; on Windows 10,
+  [install it](https://developer.microsoft.com/microsoft-edge/webview2/) if VJN6 says it is missing.
+- **Linux (Ubuntu 24.04, x64):** unpack `VJN6-<version>-Linux-x64.tar.gz`, install WebKitGTK
+  (`sudo apt install libwebkit2gtk-4.1-0`), run `./VJN6`, and copy `VJN6.vst3` into `~/.vst3` for the
+  plugin. `INSTALL.txt` has the details.
+
+`SHA256SUMS` lists the checksums. Every package carries `NOTICES.txt` with the licences of the third-party
+code built into VJN6. The web build is not packaged; it runs from a local checkout (`npm run web`, below).
+
 ## Prerequisites
 
 | Tool | Version | Needed for |
@@ -222,9 +243,17 @@ The state blob layout, its versioning rule and where each build stores it (stand
   Standalone, VST3), Ubuntu 24.04 (webkit2gtk-4.1, xvfb; Standalone, VST3) and wasm (emsdk). It runs the
   licence check, ctest (core, plugin and licence tests), pluginval at strictness 5 (VST3 everywhere, AU on
   macOS), the native and WASM benchmarks, the golden check, svelte-check, Vitest and Playwright (Chromium +
-  WebKit on Linux). Signing and notarisation steps run only when their secrets exist.
+  WebKit on Linux).
 - `.github/workflows/smoke.yml` runs after a merge to `main`: core build, `vjn6_tests "[smoke]"` and the
   licence check.
+- `.github/workflows/release.yml` is started by hand from `main` (Actions → Release → Run workflow) with a
+  version that must equal `project(VJN6 VERSION)`, the plugin `VERSION` and both `package.json` files, and
+  must not exist as a tag yet. It builds the three desktop platforms, writes `NOTICES.txt` into every
+  bundle (`tools/package/notices.py`), signs and notarises only when the signing secrets exist, packages
+  (`tools/package/`: macOS `.pkg`, Windows Inno Setup installer and zip, Linux `.tar.gz`), runs pluginval at
+  strictness 5 on the packaged plugins and attaches the packages and `SHA256SUMS` to a **draft** release
+  (pre-release by default), which you check and publish by hand. It runs no test suite: the pull request
+  into `main` already did.
 - Nothing runs on pushes to development branches. Before opening a pull request, run the local gates:
   the desktop build and `ctest`, `web/build_tests.sh`, `npm run check`, `npm test`, `npm run test:e2e` and
   `python3 tools/check_licences.py`.
@@ -242,10 +271,11 @@ ui/                     Svelte 5 + TypeScript UI (src/, tests/), Vite config; on
 tests/                  Catch2 suite: engine/, midi/, panel/, files/, golden/, util/
 banks/                  vjn6-default.vjn6bank, its sources j60-factory-chart.csv and default/*.json
 tools/                  make_default_bank.py, gen_nfc_tables.py, check_licences.py, syx_inspect.py,
-                        bench/ (vjn6_bench), display_table/, capture/ (§15.4 measurement protocol)
+                        bench/ (vjn6_bench), display_table/, capture/ (§15.4 measurement protocol),
+                        package/ (release packages and NOTICES.txt)
 docs/                   BRIDGE.md, FACTORY_BANK.md, LICENSES.md, STATE.md
 third_party/            JUCE (submodule, unmodified), Catch2 (submodule, tests only)
-.github/workflows/      ci.yml (PRs into main), smoke.yml (after merge to main)
+.github/workflows/      ci.yml (PRs into main), smoke.yml (after merge to main), release.yml (by hand)
 SPEC.md KICKOFF.md PLAN.md DECISIONS.md
 ```
 
