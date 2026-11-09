@@ -240,6 +240,16 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
 
 ## Plugin and standalone
 
+- **AC-PL3 measures CPU time (2026-11-09, as VDX's owner decision D-PL20).** "Every `render()` call under
+  50 % of its block's real-time duration" is checked on the rendering thread's CPU time across
+  `processBlock`: `CLOCK_THREAD_CPUTIME_ID` on macOS and Linux, and on Windows `QueryThreadCycleTime`
+  converted with a cycle rate measured once per thread (`GetThreadTimes` advances only once per scheduler
+  tick, more than a block). Wall time also counted the OS preempting the test thread: PR #2's macOS run
+  measured a 4.3 ms worst block against a 2.67 ms limit on a shared runner while the same code renders at
+  about 3 % of real time. Wall time stays in the failure message. CPU time does not count waiting, so
+  blocking is ruled out elsewhere: AC-E13.2 rejects locks and allocation in `render()`/`midi()`, the rest
+  of `processBlock` uses only atomics and lock-free FIFOs, and `getStateInformation` reads the lock-free
+  snapshot.
 - **Host writes (R-S3)**: every `setValue` outside the plugin's own reports (marked with a thread-local
   flag) is a host write; writes are coalesced per block and applied at offset 0 before `render()`.
 - **Reporting to the host**: core changes are reported once per changed parameter, except changes whose
