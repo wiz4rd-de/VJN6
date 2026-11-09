@@ -15,10 +15,16 @@ These are compiled into, or bundled with, the standalone app, the VST3/AU plugin
 | VST3 SDK | 3.8.0 (bundled with JUCE) | MIT | Comes with JUCE (`juce_audio_processors_headless/format_types/VST3_SDK`); compiled into the VST3 plugin. |
 | AudioUnitSDK | 1.1.0 (bundled with JUCE) | Apache-2.0 | Comes with JUCE; compiled into the AU plugin (macOS only). |
 | Svelte | 5.x (see `ui/package.json`) | MIT | Its runtime is compiled into the one UI bundle (`ui/dist`) used by every build. |
+| clsx, esm-env | as `ui/package.json` resolves them (Svelte runtime dependencies) | MIT | Imported by the Svelte runtime and compiled into the same UI bundle. |
 | Barlow Condensed | woff2, latin subset | SIL OFL 1.1 | Bundled as woff2 in `ui/src/fonts/` with its licence text `OFL-BarlowCondensed.txt`. © 2017 The Barlow Project Authors. |
 | Oswald | woff2, latin subset | SIL OFL 1.1 | Bundled as woff2 in `ui/src/fonts/` with its licence text `OFL-Oswald.txt`. © 2016 The Oswald Project Authors. |
 | Emscripten runtime and system libraries (JS loader, musl libc, LLVM libc++/libc++abi, compiler-rt) | as the emsdk used for the build | MIT / University of Illinois NCSA; LLVM parts Apache-2.0 WITH LLVM-exception | Compiled into `ui/public/vjn6.wasm` and its loader `vjn6.js` by `web/build.sh` (web build only). |
 | Microsoft Edge WebView2 SDK (static loader `WebView2LoaderStatic.lib`) | the NuGet package JUCE asks for | BSD-3-Clause (Microsoft WebView2 SDK licence) | Statically linked into the Windows standalone app and VST3 (`NEEDS_WEBVIEW2`). The WebView2 runtime itself is part of Windows and is not shipped. |
+
+Release packages carry these licences as `NOTICES.txt` in every bundle and next to every standalone
+executable: `tools/package/notices.py` writes the components above (the WebView2 SDK licence on Windows
+only) plus the licence of every package that JUCE's SPDX inventory lists as vendored inside a module VJN6
+compiles, and fails when a licence file is missing.
 
 ### JUCE licence terms (R-L1)
 
@@ -64,6 +70,7 @@ Used only to build and test VJN6. None of them is linked into or shipped with a 
 | Ninja | Apache-2.0 | Optional CMake generator. |
 | Python 3 | PSF License | Tools in `tools/` (default bank, NFC tables, licence check, SysEx inspector, capture protocol). |
 | pluginval (Tracktion) | GPL-3 | Plugin validator (AC-PL1). A separate executable that CI downloads at run time into the runner's temporary directory and runs against the built plugin. It is never committed to the repository, never linked and never shipped. |
+| Inno Setup 6 | Inno Setup License (permissive, free) | Builds the Windows installer in the release workflow (`tools/package/windows.iss`). Installed on the runner and never committed. The installer it makes embeds Inno Setup's own setup program, which its licence lets anyone distribute. |
 | Pamplejuce | MIT | Not used. VJN6 has its own CMake setup; listed because SPEC R-L2 names it. |
 
 ## Sources of numbers, not code

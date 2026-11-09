@@ -130,6 +130,48 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   `workflow_dispatch` only; after a merge to `main` a smoke-only job runs. No workflow triggers on pushes
   to development branches or on PRs into `develop/**` / `epic/**`. Per-slice verification uses the local
   gates. This narrows §15.1 ("CI runs every §13 criterion") to the PR-into-main run.
+- **Desktop matrix `fail-fast: false`.** A failure on one platform no longer cancels the others, so one run
+  reports every platform (the first PR run lost macOS and Ubuntu to a Windows compile error).
+
+## Releases (owner decision, 2026-11-09: "like VDX")
+
+- **`release.yml`, by hand only.** Started from `main` with a version that must equal
+  `project(VJN6 VERSION)`, the plugin `VERSION` and both `package.json` files and must not exist as a tag.
+  It builds the three desktop platforms (macOS universal with Xcode, Windows with MSVC, Ubuntu 24.04 with
+  Ninja), writes the licence notices, signs and notarises only when the secrets exist, packages,
+  smoke-tests the packaged plugins with pluginval at strictness 5 (VST3 everywhere, AU on macOS) and
+  attaches the packages and `SHA256SUMS` to a draft GitHub Release (pre-release by default) that the owner
+  publishes. It runs no test suite: the PR into `main` already did (owner CI rule). The workflow and
+  `tools/package/` follow VDX's release packaging, renamed for VJN6.
+- **Signing moved from ci.yml to release.yml.** Signed bundles only matter in a release; a PR run has no
+  secrets and uploads nothing to ship. The steps and secret names are unchanged, and they still run only
+  when their secrets exist (job-level env, which a step's `if` can read).
+- **Packages (`tools/package/`).** macOS: one `.pkg` with choices for the app (`/Applications`), VST3 and AU
+  (`/Library/Audio/Plug-Ins/…`), bundles not relocatable and not version-checked, package identifiers
+  `com.marcofunk.vjn6.{app,vst3,au}` after the bundle ID. Bundles without a Developer ID signature are
+  signed ad hoc, because Apple silicon runs no unsigned code and adding `NOTICES.txt` after the build breaks
+  the build's own signature; the `.pkg` stays unsigned (macOS asks once; Installer writes no quarantine
+  flag, so hosts load the plugins). Windows: an Inno Setup installer (app into Program Files\VJN6, VST3 into
+  Common Files\VST3; its AppId `0B26E3F6-0AAC-4159-865D-EA047C1C8467` never changes) plus a zip; SmartScreen
+  warns while unsigned. Linux: a `.tar.gz` with INSTALL.txt. The web build is not packaged (public hosting
+  with COOP/COEP is a §15.4 follow-up).
+- **Static MSVC runtime.** `CMAKE_MSVC_RUNTIME_LIBRARY` is `MultiThreaded` (`MultiThreadedDebug` in Debug)
+  for every target, so the standalone app and the VST3 need no Visual C++ redistributable.
+- **macOS 13 deployment target, now actually applied.** The root CMakeLists set
+  `CMAKE_OSX_DEPLOYMENT_TARGET` 13.0 after `project()`, where `project()` has already created an empty cache
+  entry that a non-forced `set(... CACHE)` leaves alone. Every macOS binary so far therefore required the
+  build machine's macOS (`minos 26.3` here, 15.x on the CI runner). It is now set before `project()` (an
+  explicit `-DCMAKE_OSX_DEPLOYMENT_TARGET` still wins), and release.yml fails unless every slice of the
+  app, VST3 and AU reports `minos 13.0`.
+- **Licence notices in the packages (R-L4).** `tools/package/notices.py` writes `NOTICES.txt` into the app,
+  VST3 and AU bundles (`Contents/Resources`) and next to the Windows/Linux executable, before signing. It
+  opens with VJN6's ownership line as docs/LICENSES.md states it (no licence is granted or implied), then
+  the JUCE EULA statement, the licence file of every package that JUCE's SPDX inventory lists as vendored
+  inside a module VJN6 compiles (the closure of `plugin/CMakeLists.txt`'s modules plus the plugin client;
+  ASIO, Oboe, AAX and the LV2/hosting packages excluded as not compiled), Svelte with its runtime
+  dependencies clsx and esm-env, the two OFL fonts and, on Windows, the WebView2 SDK licence. The script
+  fails when a licence file is missing. The R-L5 metadata check does not read `NOTICES.txt`: third-party
+  licence texts are reproduced unchanged.
 
 ## UI (Svelte)
 
