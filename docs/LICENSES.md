@@ -1,9 +1,12 @@
 # VJN6 licences
 
-VJN6 is a personal project owned by Marco Funk (© 2026 Marco Funk). This file lists every third-party
-component that ships inside a VJN6 build (SPEC R-L4), the tools used only to build and test it, and the
-material used only as a source of numbers. `tools/check_licences.py` enforces the rules (R-L3, AC-L1.1,
-AC-L2.1, AC-L4.1, AC-L5.1); the README says how to run it.
+VJN6 is a personal project owned by Marco Funk (© 2026 Marco Funk). Its own code is released under the MIT
+License (`LICENSE` in the repository root). The third-party components below keep their own licences and are
+not covered by it, and neither are the Juno-60 factory patches in the default bank (© Roland Corporation;
+see "Sources of numbers, not code"). This file lists every third-party component that ships inside a VJN6
+build (SPEC R-L4), the tools used only to build and test it, and the material used only as a source of
+numbers. `tools/check_licences.py` enforces the rules (R-L3, AC-L1.1, AC-L2.1, AC-L4.1, AC-L5.1); the README
+says how to run it.
 
 ## Shipped components
 
@@ -22,9 +25,10 @@ These are compiled into, or bundled with, the standalone app, the VST3/AU plugin
 | Microsoft Edge WebView2 SDK (static loader `WebView2LoaderStatic.lib`) | the NuGet package JUCE asks for | BSD-3-Clause (Microsoft WebView2 SDK licence) | Statically linked into the Windows standalone app and VST3 (`NEEDS_WEBVIEW2`). The WebView2 runtime itself is part of Windows and is not shipped. |
 
 Release packages carry these licences as `NOTICES.txt` in every bundle and next to every standalone
-executable: `tools/package/notices.py` writes the components above (the WebView2 SDK licence on Windows
-only) plus the licence of every package that JUCE's SPDX inventory lists as vendored inside a module VJN6
-compiles, and fails when a licence file is missing.
+executable: `tools/package/notices.py` writes VJN6's MIT License and the factory-patch attribution first,
+then the components above (the WebView2 SDK licence on Windows only) plus the licence of every package that
+JUCE's SPDX inventory lists as vendored inside a module VJN6 compiles, and fails when a licence file is
+missing.
 
 ### JUCE licence terms (R-L1)
 
@@ -82,7 +86,7 @@ Used only to build and test VJN6. None of them is linked into or shipped with a 
 | Holters & Parker, DAFx-18; Raffel & Smith, DAFx-10 | papers | Method and published constants for the BBD chorus; the implementation is original. |
 | thea.codes, "The design of the Juno DCO" | text CC-BY-SA, code Apache-2.0 | Background reading; nothing copied. The DCO is written from SPEC R-E3. |
 | Roland service notes and owner's manuals | Roland copyright | Numbers only (calibration targets, ranges, the SysEx format), plus the Juno-60 sample-sound settings and names of the next row. No scans, images or other text from them are in the repository. |
-| Juno-60 Owner's Manual sample sounds (pp. 24–28) | Roland copyright | **Shipped as data** (SPEC R-L2, v3.2): the numeric settings of the 56 sample sounds and their patch names are slots 1–56 of the default bank (`banks/vjn6-default.vjn6bank` and the core's copy), generated from `banks/j60-factory-chart.csv` by `tools/make_default_bank.py`. Attribution, the manual's full names and notes: `docs/FACTORY_BANK.md`. The VJN6 patch names contain no Roland marks (R-L5). |
+| Juno-60 Owner's Manual sample sounds (pp. 24–28) | Roland copyright | **Shipped as data** (SPEC R-L2, v3.2): the numeric settings of the 56 sample sounds and their patch names are slots 1–56 of the default bank (`banks/vjn6-default.vjn6bank` and the core's copy), generated from `banks/j60-factory-chart.csv` by `tools/make_default_bank.py`. Attribution, the manual's full names and notes: `docs/FACTORY_BANK.md`. The MIT License of VJN6's own code does not cover them. The VJN6 patch names contain no Roland marks (R-L5). |
 | Juno-106 factory patch data ("The Original 128") | Roland | **Not shipped.** VJN6 imports `.syx` files that the user owns. |
 
 ## Trademarks

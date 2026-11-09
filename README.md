@@ -26,8 +26,9 @@ They are **not code-signed**, so the operating system warns the first time.
   (`sudo apt install libwebkit2gtk-4.1-0`), run `./VJN6`, and copy `VJN6.vst3` into `~/.vst3` for the
   plugin. `INSTALL.txt` has the details.
 
-`SHA256SUMS` lists the checksums. Every package carries `NOTICES.txt` with the licences of the third-party
-code built into VJN6. The web build is not packaged; it runs from a local checkout (`npm run web`, below).
+`SHA256SUMS` lists the checksums. Every package carries `NOTICES.txt` with VJN6's licence (MIT), the
+attribution of the Roland factory patches and the licences of the third-party code built into VJN6. The
+web build is not packaged; it runs from a local checkout (`npm run web`, below).
 
 ## Prerequisites
 
@@ -281,6 +282,19 @@ SPEC.md KICKOFF.md PLAN.md DECISIONS.md
 
 ## Licence
 
-VJN6 is a personal project by Marco Funk, built on JUCE 9 under the JUCE Starter licence. Third-party
-components and their licences are listed in [docs/LICENSES.md](docs/LICENSES.md). Roland, JUNO, Juno-60 and
-Juno-106 are trademarks of Roland Corporation.
+VJN6's own code is released under the [MIT License](LICENSE). Third-party components keep their own
+licences; [docs/LICENSES.md](docs/LICENSES.md) lists them.
+
+The MIT License does not cover the Juno-60 factory patches in slots 1–56 of the default bank. Their
+settings and names are © Roland Corporation, and VJN6 ships them as data with attribution
+([docs/FACTORY_BANK.md](docs/FACTORY_BANK.md)). They are `banks/j60-factory-chart.csv` and what
+`tools/make_default_bank.py` generates from it: `banks/default/001-…json` to `056-…json` and slots 1–56 of
+`banks/vjn6-default.vjn6bank` and of the core's copy `core/state/default_bank.inc`.
+
+JUCE is not covered by the MIT License either. It is a git submodule pointing at the upstream JUCE
+repository, and the standalone app and the plugins use it under the JUCE 9 Starter licence. Anyone who
+builds or distributes those builds must use JUCE under its own terms: one of the JUCE 9 EULA tiers, or the
+AGPLv3. The core library `vjn6_core` and the web build do not use JUCE.
+
+Roland, JUNO, Juno-60 and Juno-106 are trademarks of Roland Corporation. VJN6 is not affiliated with or
+endorsed by Roland.

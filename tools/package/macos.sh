@@ -65,8 +65,11 @@ This installer puts:
 "Customize" on the next page lets you leave any of them out.
 To uninstall, delete those items.
 
-Each installed item contains Contents/Resources/NOTICES.txt with the
-licences of the third-party code built into it.
+VJN6 is released under the MIT License. Each installed item contains
+Contents/Resources/NOTICES.txt with the licences of VJN6 and of the
+third-party code built into it, and the attribution of the Roland
+factory patches in the default bank, which the MIT License does not
+cover.
 
 https://github.com/wiz4rd-de/VJN6
 EOF

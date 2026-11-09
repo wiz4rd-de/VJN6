@@ -11,7 +11,7 @@ if(NOT EXISTS "${VJN6_UI_DIST}/index.html")
 endif()
 
 juce_add_plugin(VJN6
-    PRODUCT_NAME "VJN6"  PLUGIN_NAME "VJN6"  VERSION 0.1.0
+    PRODUCT_NAME "VJN6"  PLUGIN_NAME "VJN6"  VERSION 0.1.1
     COMPANY_NAME "Marco Funk"  COMPANY_COPYRIGHT "© 2026 Marco Funk"
     BUNDLE_ID com.marcofunk.vjn6
     PLUGIN_MANUFACTURER_CODE Mfnk  PLUGIN_CODE Vjn6

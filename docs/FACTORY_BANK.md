@@ -4,8 +4,9 @@
 
 Slots 1–56 of the VJN6 default bank (SPEC §15.3) are the 56 sample sounds of the **Roland Juno-60 Owner's
 Manual**: the patch settings printed on pp. 25–28 and the patch names listed on p. 24. The settings and
-names are © Roland Corporation; VJN6 ships them as data (SPEC R-L2), with this attribution. VJN6 is not
-affiliated with Roland. No Juno-106 factory data ("The Original 128") is included.
+names are © Roland Corporation; VJN6 ships them as data (SPEC R-L2), with this attribution. The MIT
+License of VJN6's own code does not cover them. VJN6 is not affiliated with Roland. No Juno-106 factory
+data ("The Original 128") is included.
 
 - **Source of the numbers:** `banks/j60-factory-chart.csv` holds the chart values as printed (columns left to
   right as on the charts). It was transcribed twice, independently, from 300-dpi renders of pp. 25–28; the

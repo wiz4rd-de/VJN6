@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Writes NOTICES.txt for a VJN6 binary distribution (DECISIONS.md "Releases").
+"""Writes NOTICES.txt for a VJN6 binary distribution (DECISIONS.md "Releases", "Licence").
 
-The file holds the licence text of every third-party component compiled into the plugin and standalone
-builds: the shipped components of docs/LICENSES.md, plus the code that JUCE vendors in the modules VJN6
-links. That JUCE list comes from JUCE's own SPDX inventory (third_party/JUCE/JUCE.spdx.json) and the module
+The file holds VJN6's own licence (MIT, the repository's LICENSE), the attribution of the Roland factory
+patches in the default bank, which the MIT License does not cover, and the licence text of every
+third-party component compiled into the plugin and standalone builds: the shipped components of
+docs/LICENSES.md, plus the code that JUCE vendors in the modules VJN6 links. That JUCE list comes from JUCE's own SPDX inventory (third_party/JUCE/JUCE.spdx.json) and the module
 dependency closure, so it follows JUCE updates by itself; the script fails when it cannot find a licence
 file, rather than ship an incomplete notice.
 
@@ -121,17 +122,30 @@ def build(webview2_license):
     modules = ROOT / "node_modules"  # npm workspace: the UI's packages are hoisted to the root
     fonts = ROOT / "ui" / "src" / "fonts"
     parts = [
-        "VJN6 %s: third-party licence notices\n\n"
-        "VJN6 is a personal project owned by Marco Funk (c) 2026 Marco Funk.\n"
-        "The sections below are the third-party components compiled into this build,\n"
-        "each under its own licence. docs/LICENSES.md in the source repository lists\n"
-        "them by use.\n\n" % project_version(ROOT / "CMakeLists.txt", "VJN6"),
+        "VJN6 %s: licence notices\n\n"
+        "VJN6's own code is released under the MIT License (first section). The\n"
+        "Juno-60 factory patches in slots 1-56 of the default bank belong to Roland\n"
+        "and are not covered by it (second section). The other sections are the\n"
+        "third-party components compiled into this build, each under its own\n"
+        "licence, which the MIT License does not cover. docs/LICENSES.md in the\n"
+        "source repository lists them by use.\n\n" % project_version(ROOT / "CMakeLists.txt", "VJN6"),
+        section("VJN6", "MIT", read(ROOT / "LICENSE")),
+        section(
+            "Default bank, slots 1-56: the Juno-60 factory patches",
+            "(c) Roland Corporation; not covered by the MIT License",
+            "Slots 1-56 of the VJN6 default bank are the 56 sample sounds of the Roland\n"
+            "Juno-60 Owner's Manual: the patch settings printed on pp. 25-28 and the\n"
+            "patch names listed on p. 24. The settings and names are (c) Roland\n"
+            "Corporation; VJN6 ships them as data, with this attribution. VJN6 is not\n"
+            "affiliated with or endorsed by Roland. Roland, JUNO and Juno-60 are\n"
+            "trademarks of Roland Corporation.",
+        ),
         section(
             "JUCE %s" % project_version(JUCE / "CMakeLists.txt", "JUCE"),
             "JUCE 9 End User Licence Agreement (Starter)",
             "VJN6 uses the JUCE framework under the JUCE 9 End User Licence Agreement,\n"
-            "https://juce.com/legal/juce-9-licence/. Code that JUCE vendors follows\n"
-            "under its own licences.",
+            "https://juce.com/legal/juce-9-licence/. JUCE is not covered by the MIT\n"
+            "License above. Code that JUCE vendors follows under its own licences.",
         ),
     ]
     for name, version, lic, path in juce_vendored(linked_modules()):

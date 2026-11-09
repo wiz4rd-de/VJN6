@@ -165,13 +165,37 @@ behaviour, no new state/setting/UI), conflicts and retuned constants. Newest ent
   app, VST3 and AU reports `minos 13.0`.
 - **Licence notices in the packages (R-L4).** `tools/package/notices.py` writes `NOTICES.txt` into the app,
   VST3 and AU bundles (`Contents/Resources`) and next to the Windows/Linux executable, before signing. It
-  opens with VJN6's ownership line as docs/LICENSES.md states it (no licence is granted or implied), then
-  the JUCE EULA statement, the licence file of every package that JUCE's SPDX inventory lists as vendored
-  inside a module VJN6 compiles (the closure of `plugin/CMakeLists.txt`'s modules plus the plugin client;
-  ASIO, Oboe, AAX and the LV2/hosting packages excluded as not compiled), Svelte with its runtime
-  dependencies clsx and esm-env, the two OFL fonts and, on Windows, the WebView2 SDK licence. The script
-  fails when a licence file is missing. The R-L5 metadata check does not read `NOTICES.txt`: third-party
-  licence texts are reproduced unchanged.
+  opens with VJN6's MIT License (the repository's `LICENSE`) and the attribution of the Juno-60 factory
+  patches, which the MIT License does not cover (see "Licence" below). Then come the JUCE EULA statement,
+  the licence file of every package that JUCE's SPDX inventory lists as vendored inside a module VJN6
+  compiles (the closure of `plugin/CMakeLists.txt`'s modules plus the plugin client; ASIO, Oboe, AAX and
+  the LV2/hosting packages excluded as not compiled), Svelte with its runtime dependencies clsx and
+  esm-env, the two OFL fonts and, on Windows, the WebView2 SDK licence. The script fails when a licence
+  file is missing. The R-L5 metadata check does not read `NOTICES.txt`: third-party
+  licence texts are reproduced unchanged, and the factory-patch attribution must name Roland and the
+  Juno-60, as `docs/FACTORY_BANK.md` does (R-L5 allows the attribution).
+- **0.1.0 stays as published; 0.1.1 is the first release under the MIT License.** 0.1.0 was published
+  (pre-release, 2026-11-09) before the licence decision below, so its `NOTICES.txt` grants no licence. It
+  is not rebuilt or replaced: a published version's files and checksums never change.
+
+## Licence (owner decision, 2026-11-09: "MIT just like VDX")
+
+- **VJN6's own code is MIT-licensed.** `LICENSE` is the MIT License, © 2026 Marco Funk, word for word as
+  VDX's, so that GitHub and package tools recognise it; both `package.json` files say `"license": "MIT"`.
+  The MIT License covers only VJN6's own code. It does not put JUCE under an open-source licence, so it is
+  compatible with the JUCE 9 Starter EULA (R-L1), as in VDX.
+- **The Juno-60 factory patches are excluded.** Slots 1–56 of the default bank are the settings and names
+  of the Juno-60 Owner's Manual sample sounds, © Roland Corporation, shipped as data with attribution
+  (R-L2, C-7). The MIT grant cannot cover them, so the exclusion is stated where the licence is stated
+  rather than inside `LICENSE` (which stays the standard text): README "Licence", `docs/LICENSES.md`,
+  `docs/FACTORY_BANK.md` and `NOTICES.txt`. The excluded files are `banks/j60-factory-chart.csv` and what
+  `tools/make_default_bank.py` generates from it (`banks/default/001-…056-*.json`, slots 1–56 of
+  `banks/vjn6-default.vjn6bank` and `core/state/default_bank.inc`). Slot 57 (`INIT`) and the eight
+  original patches in slots 58–65 are VJN6's own and MIT-licensed.
+- **Third-party components keep their own licences** (`docs/LICENSES.md`); the submodules in
+  `third_party/` and the fonts in `ui/src/fonts` are not covered by the MIT License.
+- SPEC R-L1 is unchanged: VJN6 is still a personal project owned by Marco Funk, and the JUCE Starter cap
+  and its options (JUCE Indie, or the AGPLv3) still apply.
 
 ## UI (Svelte)
 
