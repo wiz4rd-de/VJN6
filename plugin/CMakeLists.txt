@@ -73,11 +73,15 @@ target_include_directories(VJN6
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_compile_features(VJN6 PUBLIC cxx_std_17)
 
+# NEEDS_WEBVIEW2 only links WebView2LoaderStatic.lib; JUCE uses WebView2 (and offers
+# Options::withResourceProvider on Windows) only with this flag. PUBLIC so every translation unit that
+# includes the JUCE headers (the plugin tests too) sees the same WebBrowserComponent::Options.
 target_compile_definitions(VJN6 PUBLIC
   JUCE_WEB_BROWSER=1
   JUCE_USE_CURL=0
   JUCE_VST3_CAN_REPLACE_VST2=0
-  JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+  JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
+  $<$<PLATFORM_ID:Windows>:JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1>)
 
 target_link_libraries(VJN6
   PRIVATE
