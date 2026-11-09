@@ -55,6 +55,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
+      # Every platform runs to the end, so one run reports all failures (the full suite runs once per
+      # push to the PR; a cancelled platform would need another run to show its result).
+      fail-fast: false
       matrix:
         include:
           - name: macOS universal (Xcode; Standalone, VST3, AU)
